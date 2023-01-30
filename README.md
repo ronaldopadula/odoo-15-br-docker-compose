@@ -1,69 +1,77 @@
-# Quick install
+# Instalação simpleficada
 
-Installing Odoo 15 with one command.
+Instalando o Odoo 15 com apenas um comando.
 
-(Supports multiple Odoo instances on one server)
+(Suporta várias instâncias na mesma máquina.)
 
-Install [docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/) yourself, then run:
 
-``` bash
-curl -s https://raw.githubusercontent.com/ronaldopadula/odoo-15-docker-compose/master/run.sh | sudo bash -s odoo-one 10015 20015
-```
+Instalar primeiramente na sua máquina o [docker](https://docs.docker.com/get-docker/) e o [docker-compose](https://docs.docker.com/compose/install/) para que seja possível fazer a instalação. 
 
-to set up first Odoo instance @ `localhost:10015` (default master password: `minhng.info`)
-
-and
+Vamos usar a ferramenta cURL ("URL do cliente"), para fazer as tranferências de dados, assim, devese-se checar se há o cURL instalado:
 
 ``` bash
-curl -s https://raw.githubusercontent.com/ronaldopadula/odoo-15-docker-compose/master/run.sh | sudo bash -s odoo-two 11015 21015
+curl --version
 ```
-
-to set up another Odoo instance @ `localhost:11015` (default master password: `minhng.info`)
-
-Some arguments:
-* First argument (**odoo-one**): Odoo deploy folder
-* Second argument (**10015**): Odoo port
-* Third argument (**20015**): live chat port
-
-If `curl` is not found, install it:
+Se não tiver instalado, fazê-lo com o seguinte código:
 
 ``` bash
 $ sudo apt-get install curl
-# or
+# ou
 $ sudo yum install curl
 ```
 
-# Usage
+Agora, rodar a instalação do Odoo14 através do seguinte código:
 
-Start the container:
+``` bash
+curl -s https://raw.githubusercontent.com/ronaldopadula/odoo-15-br-docker-compose/master/instalar.sh | sudo bash -s odoo15-one 10015 20015
+```
+
+para configurar a primeira instância do Odoo15 @ 'localhost:10015' (senha mestra padrão: 'ronaldo.padula')
+
+e
+
+``` bash
+curl -s https://raw.githubusercontent.com/ronaldopadula/odoo-15-br-docker-compose/master/instalar.sh | sudo bash -s odoo15-two 11015 21015
+```
+
+para configurar uma segunda instância do Odoo @ 'localhost:11015' (senha mestra padrão: 'ronaldo.padula')
+
+Nos links anteriores, :
+* Primeiro Argumento (**odoo15-one**): Pasta de deploy do Odoo15
+* Segundo argumento (**10015**): Porta para o Odoo
+* Terceiro argumento (**20015**): porta para o live chat
+
+# Usando
+
+Iniciar o container:
 ``` sh
 docker-compose up
 ```
 
-* Then open `localhost:10015` to access Odoo 15.0. If you want to start the server with a different port, change **10015** to another value in **docker-compose.yml**:
+* Posteriormente abrir `localhost:10015` para acessar a instalação do Odoo 15. Se precisar inciar o servidor Odoo em uma porta diferente, mudar **10015** para outro valor referente a porta escolhida no arquivo **docker-compose.yml**:
 
 ```
 ports:
  - "10015:8069"
 ```
 
-Run Odoo container in detached mode (be able to close terminal without stopping Odoo):
+Executar o contêiner Odoo no modo desanexado (ser capaz de fechar o terminal sem parar Odoo):
 
 ```
 docker-compose up -d
 ```
 
-**If you get the permission issue**, change the folder permission to make sure that the container is able to access the directory:
+**Se receber mensagem com o problema de permissão**, altere a permissão da pasta para certificar-se de que o contêiner é capaz de acessar o diretório:
 
 ``` sh
-$ git clone https://github.com/ronaldopadula/odoo-15-docker-compose
+$ git clone https://github.com/ronaldopadula/odoo-15-br-docker-compose.git
 $ sudo chmod -R 777 addons
 $ sudo chmod -R 777 etc
 $ mkdir -p postgresql
 $ sudo chmod -R 777 postgresql
 ```
 
-Increase maximum number of files watching from 8192 (default) to **524288**. In order to avoid error when we run multiple Odoo instances. This is an *optional step*. These commands are for Ubuntu user:
+Para evitar erros quando executamos várias instâncias do Odoo., deve-se aumentar o número máximo de arquivos em execução de 8192 (padrão) para 524288. Esta é uma etapa opcional, que no ubuntu é feita com os seguintes comandos:
 
 ```
 $ if grep -qF "fs.inotify.max_user_watches" /etc/sysctl.conf; then echo $(grep -F "fs.inotify.max_user_watches" /etc/sysctl.conf); else echo "fs.inotify.max_user_watches = 524288" | sudo tee -a /etc/sysctl.conf; fi
@@ -72,15 +80,15 @@ $ sudo sysctl -p    # apply new config immediately
 
 # Custom addons
 
-The **addons/** folder contains custom addons. Just put your custom addons if you have any.
+A pasta addons/ conportará addons personalizados. Basta colocar seus addons personalizados, se você tiver algum.
 
-# Odoo configuration & log
+# Configuração e log do Odoo
 
-* To change Odoo configuration, edit file: **etc/odoo.conf**.
-* Log file: **etc/odoo-server.log**
-* Default database password (**admin_passwd**) is `minhng.info`, please change it @ [etc/odoo.conf#L60](/etc/odoo.conf#L60)
+* Para mudar as configurações do odoo, editar o arquivo: **etc/odoo.conf**.
+* O arquivo de log do Odoo é : **etc/odoo-server.log**
+* O password padrão da base de dados (**admin_passwd**) é `ronaldo.padula`, mas você pode mudar isso em @ [etc/odoo.conf#L60](/etc/odoo.conf#L60)
 
-# Odoo container management
+# Para administrar os containeres
 
 **Run Odoo**:
 
@@ -102,9 +110,9 @@ docker-compose down
 
 # Live chat
 
-In [docker-compose.yml#L21](docker-compose.yml#L21), we exposed port **20015** for live-chat on host.
+Em [docker-compose.yml#L21](docker-compose.yml#L21), nós expomos a porta **20015** para o host do live-chat.
 
-Configuring **nginx** to activate live chat feature (in production):
+Configurar o **nginx** para ativar o recurso de live-chat (em produção):
 
 ``` conf
 #...
