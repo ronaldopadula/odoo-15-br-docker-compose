@@ -20,7 +20,7 @@ $ sudo apt-get install curl
 $ sudo yum install curl
 ```
 
-Agora, rodar a instalação do Odoo14 através do seguinte código:
+Agora, rodar a instalação do Odoo15 através do seguinte código:
 
 ``` bash
 curl -s https://raw.githubusercontent.com/ronaldopadula/odoo-15-br-docker-compose/master/instalar.sh | sudo bash -s odoo15-one 10015 20015
