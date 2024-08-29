@@ -1,3 +1,6 @@
+# Em primeiro lugar:
+Fork criado apenas para utilização em demonstração. Tradução ao Português com todos os créditos ao criado do código.
+
 # Instalação simpleficada
 
 Instalando o Odoo 15 com apenas um comando.
