@@ -1,35 +1,50 @@
-version: '2'
+# Odoo 15 + PostgreSQL — uma instância por pasta de deploy.
+# Os valores ${...} vêm do arquivo .env, gerado pelo instalar.sh (não versionado).
 services:
   db:
-    image: postgres:14
-    user: root
+    image: ${POSTGRES_IMAGE:-postgres:16}
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=odoo
-      - POSTGRES_PASSWORD=odoo15@2021      
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
       - POSTGRES_DB=postgres
-    restart: always             # run as a service
+    secrets:
+      - db_password
     volumes:
-        - ./postgresql:/var/lib/postgresql/data
+      - ./postgresql:/var/lib/postgresql/data
+    networks:
+      - interna
+    # Nenhuma porta publicada: o banco só é acessível pelo contêiner do Odoo.
 
   odoo15:
-    image: odoo:15
-    user: root
+    image: ${ODOO_IMAGE:-odoo:15.0}
+    restart: unless-stopped
     depends_on:
       - db
     ports:
-      - "10015:8069"
-      - "20015:8072" # live chat
+      # Publicadas apenas em 127.0.0.1: o acesso externo passa pelo Nginx (HTTPS).
+      # O Docker cria regras próprias de firewall que o ufw não filtra; por isso
+      # nunca publique estas portas em 0.0.0.0.
+      - "127.0.0.1:${ODOO_PORT:-10015}:8069"
+      - "127.0.0.1:${CHAT_PORT:-20015}:8072"
     tty: true
     command: --
     environment:
       - HOST=db
       - USER=odoo
-      - PASSWORD=odoo15@2021
+      - PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password
     volumes:
-      #- /etc/timezone:/etc/timezone:ro
-      #- /etc/localtime:/etc/localtime:ro
-      # - ./entrypoint.sh:/entrypoint.sh   # if you want to install additional Python packages, uncomment this line!
+      # - ./entrypoint.sh:/entrypoint.sh   # descomente para instalar pacotes Python extras (etc/requirements.txt)
       - ./addons:/mnt/extra-addons
       - ./etc:/etc/odoo
-    restart: always             # run as a service
-    
+    networks:
+      - interna
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+
+networks:
+  interna:

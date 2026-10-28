@@ -1,8 +1,9 @@
-# -----------------------
-# | Add Python packages |
-# -----------------------
-# To install below packages at startup, uncomment this line in "docker-compose.yml" file!
-# - ./entrypoint.sh:/entrypoint.sh
-# then down the docker container ($ docker-compose down) and up it again ($ docker-compose up -d).
-# -----------------------
-# paramiko==2.7.2 # for auto_backup module
+# -----------------------------------------------------------------------------
+# Pacotes Python extras
+# -----------------------------------------------------------------------------
+# Para instalá-los na inicialização, descomente no docker-compose.yml a linha
+#   - ./entrypoint.sh:/entrypoint.sh
+# e reinicie:  docker compose down && docker compose up -d
+# -----------------------------------------------------------------------------
+# openupgradelib       # exigido pela localização brasileira da Trustcode (odoo-brasil)
+# paramiko==2.7.2      # para o módulo auto_backup
