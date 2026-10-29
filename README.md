@@ -16,7 +16,7 @@ Instala uma instância do Odoo 15 com um comando. Suporta várias instâncias na
 | Senha mestra fixa e publicada no repositório | senha mestra aleatória, gerada na instalação |
 | Senha do banco fixa no `docker-compose.yml` | senha aleatória em `secrets/db_password.txt` (docker secret) |
 | Gerenciador de bancos aberto (`/web/database/manager`) | `list_db = False` e `dbfilter` restrito à base da instância |
-| Porta do Odoo aberta para a internet | publicada só em `127.0.0.1`; acesso externo pelo Nginx com HTTPS |
+| Porta do Odoo aberta para a internet | Odoo só em `127.0.0.1`; o instalador publica pelo Nginx (porta 80) e mostra o endereço |
 | `chmod -R 777` e contêineres como `root` | o Odoo roda como usuário `odoo`; arquivos com permissões restritas |
 | `dev_mode = reload` (modo de desenvolvimento) | modo de produção, com `workers` e `proxy_mode` |
 | Imagens sem versão fixa | o instalador grava o *digest* das imagens no `.env` |
@@ -47,23 +47,44 @@ Argumentos:
 * **20015**: porta local do live chat
 * **empresa** (opcional, padrão `odoo`): nome da base de dados criada
 
-As senhas geradas ficam em `odoo15-one/.credenciais`, legível só pelo root:
+Ao final, o instalador mostra o endereço de acesso, o usuário e a senha:
+
+```
+==============================================================
+ Odoo 15 pronto
+   Acesse:  http://IP_DO_SERVIDOR
+   Usuário: admin
+   Senha:   (gerada na instalação)
+==============================================================
+```
+
+Para isso ele instala o Nginx (se necessário), publica a instância na porta 80 e libera a porta
+no `ufw`. Se o navegador não abrir, verifique se o firewall de nuvem do provedor permite a porta.
+Todas as senhas, inclusive a senha mestra, ficam em `odoo15-one/.credenciais`, legível só pelo root:
 
 ``` bash
 sudo cat odoo15-one/.credenciais
 ```
 
-Segunda instância na mesma máquina: use outra pasta e outras portas, por exemplo
-`sudo bash instalar.sh odoo15-two 11015 21015 outraempresa`.
+**Segunda instância na mesma máquina:** a porta 80 já estará em uso pela primeira. Use outra pasta,
+outras portas internas e uma porta pública diferente:
+
+``` bash
+sudo PORTA_PUBLICA=8099 bash instalar.sh odoo15-two 11015 21015 outraempresa
+```
+
+O acesso fica em `http://IP_DO_SERVIDOR:8099`.
 
 ## Acesso
 
-O Odoo atende só em `127.0.0.1`. Há duas formas de acessar:
+O Odoo atende só em `127.0.0.1`; quem o publica é o Nginx, configurado pelo instalador.
 
-**Servidor na internet (produção):** configure o Nginx com o modelo [`nginx/odoo.conf.example`](nginx/odoo.conf.example)
-e emita o certificado com `certbot --nginx -d SEU_DOMINIO --redirect`. Acesse por `https://SEU_DOMINIO`.
+**HTTPS (recomendado para uso real):** aponte um domínio para o servidor e rode
+`certbot --nginx -d SEU_DOMINIO --redirect`. Acesse por `https://SEU_DOMINIO`.
+O modelo [`nginx/odoo.conf.example`](nginx/odoo.conf.example) serve para configurar à mão.
 
-**Teste rápido sem domínio:** abra um túnel SSH do seu computador e acesse `http://localhost:10015`:
+**Sem publicar na internet:** instale com `PORTA_PUBLICA=0` e acesse por túnel SSH,
+abrindo `http://localhost:10015` no navegador:
 
 ``` bash
 ssh -L 10015:127.0.0.1:10015 usuario@IP_DO_SERVIDOR
