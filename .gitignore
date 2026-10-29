@@ -1,4 +1,9 @@
+# Dados e segredos de cada instância — nunca versionar
+.env
+.credenciais
+secrets/
 postgresql/
+etc/odoo.conf
 etc/odoo-server.log
 etc/addons/
 etc/sessions/
