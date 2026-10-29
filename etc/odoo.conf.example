@@ -1,0 +1,35 @@
+[options]
+; ---------------------------------------------------------------------------
+; Modelo de configuração. O instalar.sh copia este arquivo para etc/odoo.conf
+; (não versionado) e preenche os campos __ENTRE_SUBLINHADOS__.
+; Referência completa das opções: odoo --help
+; ---------------------------------------------------------------------------
+
+addons_path = /mnt/extra-addons
+data_dir = /etc/odoo
+logfile = /etc/odoo/odoo-server.log
+log_level = info
+
+; Senha mestra (gerenciador de bancos). Gerada aleatoriamente na instalação.
+admin_passwd = __ADMIN_PASSWD__
+
+; Segurança: sem lista nem gerenciador de bancos pela web; o Odoo atende
+; apenas a base definida abaixo.
+list_db = False
+dbfilter = __DBFILTER__
+
+; Atrás de um proxy reverso (Nginx). Necessário para HTTPS e IP real do cliente.
+proxy_mode = True
+
+; Modo de produção com processos separados. Com workers > 0 o live chat e as
+; notificações usam a porta 8072 (longpolling), publicada pelo docker-compose.
+workers = 2
+max_cron_threads = 1
+limit_memory_soft = 805306368
+limit_memory_hard = 1073741824
+limit_time_cpu = 300
+limit_time_real = 600
+limit_request = 8192
+
+; Não use dev_mode em produção.
+; dev_mode = reload
