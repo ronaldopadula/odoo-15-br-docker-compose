@@ -11,6 +11,7 @@
 #    sudo DOMINIO=erp.exemplo.com.br bash instalar.sh odoo15-prod 10015
 #                                                           # acesso: https://erp.exemplo.com.br
 #
+#  - Se faltarem, instala sozinho o Docker e o git (Ubuntu/Debian).
 #  - Cada instância tem uma porta própria e atende várias bases (seleção no login).
 #  - Gerenciador de Bancos disponível pelo navegador, protegido por usuário e
 #    senha do proxy e pela senha mestra do Odoo (ambas geradas na instalação).
@@ -56,12 +57,41 @@ if [ -n "$DOMINIO" ]; then
   done
 fi
 
-command -v docker >/dev/null || erro "Docker não encontrado: https://docs.docker.com/engine/install/"
-if docker compose version >/dev/null 2>&1; then DC=(docker compose)
-elif command -v docker-compose >/dev/null; then DC=(docker-compose)
-else erro "Docker Compose não encontrado."; fi
-command -v openssl >/dev/null || erro "openssl não encontrado."
-command -v git >/dev/null || erro "git não encontrado."
+# Docker, git e openssl: instala automaticamente no Ubuntu/Debian se faltarem
+# (repositório oficial do Docker, conforme docs.docker.com/engine/install).
+instalar_dependencias() {
+  . /etc/os-release
+  case "${ID:-}" in ubuntu|debian) ;; *)
+    erro "instale o Docker manualmente (https://docs.docker.com/engine/install/) e rode de novo." ;;
+  esac
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -q
+  apt-get install -y -q ca-certificates curl git openssl
+  if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
+    echo ">> Instalando o Docker (repositório oficial)"
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL "https://download.docker.com/linux/$ID/gpg" -o /etc/apt/keyrings/docker.asc \
+      || erro "não foi possível acessar download.docker.com; verifique a internet do servidor."
+    chmod a+r /etc/apt/keyrings/docker.asc
+    cat > /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/$ID
+Suites: ${UBUNTU_CODENAME:-$VERSION_CODENAME}
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+    apt-get update -q
+    apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    systemctl enable --now docker >/dev/null 2>&1 || true
+  fi
+}
+if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1 \
+   || ! command -v git >/dev/null || ! command -v openssl >/dev/null; then
+  echo ">> Instalando os programas necessários (Docker, git)"
+  instalar_dependencias </dev/null
+fi
+DC=(docker compose)
 
 gerar() { openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-"$1"; }
 
@@ -214,9 +244,12 @@ echo "     senha do proxy:      $GESTOR_SENHA"
 echo "     senha mestra:        $SENHA_MESTRA"
 if [ -n "$BASE" ]; then
   echo "   Base '$BASE':  usuário admin / senha $SENHA_ADMIN"
+else
+  echo
+  echo "   Primeiro passo: abra o Gerenciador de Bancos e crie uma base."
 fi
 echo
-echo "   Tudo isso fica guardado em: $(pwd)/.credenciais"
+echo "   Para ver estes dados de novo: sudo cat $(pwd)/.credenciais"
 echo "=============================================================="
 if [ -z "$DOMINIO" ]; then
   echo "Acesso por HTTP, sem criptografia: use para testes. Para produção,"
