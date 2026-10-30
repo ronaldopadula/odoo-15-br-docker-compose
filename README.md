@@ -1,174 +1,266 @@
 # Em primeiro lugar:
 Fork criado apenas para utilização em demonstração. Tradução ao Português com todos os créditos ao criador do código.
 
-# Odoo 15 com Docker Compose — instalação simples, interfaces disponíveis e segura
+# Odoo 15 em um comando
 
-Instala uma instância do Odoo 15 com um comando. Cada instância tem sua porta, atende várias bases
-de dados e oferece o **Gerenciador de Bancos** pelo navegador (criar, duplicar, fazer backup e
-restaurar bases). Suporta várias instâncias na mesma máquina.
+Instala o Odoo 15 num servidor Linux (Ubuntu ou Debian) com **um único comando**.
+Ao final, o instalador mostra o endereço de acesso e todas as senhas.
 
-> **Aviso:** o Odoo 15 não recebe mais correções. O último commit do branch 15.0 do Odoo é de 14/10/2024,
-> e a imagem `odoo:15.0` foi retirada do repositório oficial de imagens (odoo/docker) em 07/10/2024.
-> Em produção, use sempre com domínio e HTTPS.
+> O Odoo 15 não recebe mais atualizações de segurança do fabricante desde outubro de 2024.
+> Para uso real, siga o passo **"Usar com domínio (HTTPS)"** mais abaixo.
 
-## Como funciona
+---
 
-```
-navegador ──> proxy Caddy (porta da instância) ──> Odoo ──> PostgreSQL
-```
+## Instalação passo a passo
 
-Só o proxy recebe conexões de fora. O Odoo e o PostgreSQL ficam numa rede interna do Docker.
+### 1. Entre no servidor
 
-| Item | Como fica |
-|---|---|
-| Acesso | `http://IP:PORTA` (teste) ou `https://seu.dominio` com certificado automático (produção) |
-| Bases de dados | várias por instância; o usuário escolhe a base no login |
-| Gerenciador de Bancos | `…/web/database/manager`, protegido por **duas senhas**: a do proxy (usuário `gestor`) e a senha mestra do Odoo |
-| Live chat / notificações | encaminhados pelo proxy, sem porta extra |
-| Senhas | todas aleatórias, geradas na instalação e exibidas no final; nada fica no repositório |
-| Contêineres | Odoo roda sem root; sem `chmod 777`; imagens fixadas por *digest* |
-
-## Requisitos
-
-Linux com Docker e o plugin Compose. No Ubuntu, conforme a documentação oficial do Docker:
+Pelo console do provedor (ex.: DigitalOcean › *Droplet* › *Console*) ou por SSH:
 
 ``` bash
-sudo apt-get update && sudo apt-get install -y ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin git
+ssh root@IP_DO_SERVIDOR
 ```
 
-## Instalação
-
-Baixe o instalador, confira e execute:
+### 2. Rode o instalador
 
 ``` bash
 curl -fsSLO https://raw.githubusercontent.com/ronaldopadula/odoo-15-br-docker-compose/master/instalar.sh
-less instalar.sh
-```
-
-**Teste, pelo IP do servidor:**
-
-``` bash
 sudo bash instalar.sh odoo15-one 10015
 ```
 
-**Produção, com domínio e HTTPS automático** (o domínio deve apontar para o servidor, e as portas
-80 e 443 devem estar livres):
+- `odoo15-one` é o nome da pasta onde a instalação fica guardada.
+- `10015` é a porta de acesso.
 
-``` bash
-sudo DOMINIO=erp.seudominio.com.br EMAIL=ti@seudominio.com.br bash instalar.sh odoo15-prod 10015
-```
+O instalador faz tudo sozinho: instala o Docker (se precisar), gera as senhas e liga o Odoo.
+Leva de 3 a 10 minutos.
 
-Argumentos: `<pasta> <porta> [base_inicial]`. Se informar `base_inicial`, a base já é criada, com senha
-aleatória para o usuário `admin`. Sem ela, crie as bases pelo Gerenciador de Bancos.
+### 3. Guarde os dados do quadro final
 
-Ao final, o instalador mostra tudo o que é preciso:
+No final aparece um quadro com os endereços e as senhas:
 
 ```
 ==============================================================
  Odoo 15 pronto
 
-   Acesse:                http://IP:10015
-   Gerenciador de Bancos: http://IP:10015/web/database/manager
+   Acesse:                http://IP_DO_SERVIDOR:10015
+   Gerenciador de Bancos: http://IP_DO_SERVIDOR:10015/web/database/manager
      usuário do proxy:    gestor
-     senha do proxy:      (gerada)
-     senha mestra:        (gerada)
+     senha do proxy:      ••••••••
+     senha mestra:        ••••••••
 ==============================================================
 ```
 
-Esses dados ficam guardados em `<pasta>/.credenciais` (só o root lê):
+### 4. Crie a sua primeira base de dados
+
+Abra o endereço do **Gerenciador de Bancos**. O navegador pede um usuário e uma senha:
+digite **`gestor`** e a **senha do proxy** mostrada no quadro.
+
+> **Não abriu?** O provedor provavelmente tem um firewall. Na DigitalOcean:
+> *Networking › Firewalls* › regra de entrada liberando a porta **10015** (TCP).
+
+<img src="screenshots/1-senha-do-gerenciador.png" width="600" alt="Janela de usuário e senha do navegador">
+
+> O aviso "conexão não é particular" aparece porque o acesso pelo IP não tem criptografia.
+> Ele some quando você usa um domínio (veja *Usar com domínio (HTTPS)*).
+
+Em seguida aparece o formulário de criação da base. Ele é do próprio Odoo e vem em inglês:
+
+<img src="screenshots/2-criar-base.png" width="380" alt="Formulário de criação de base do Odoo">
+
+| Campo | O que preencher |
+|---|---|
+| **Master Password** | a **senha mestra** mostrada no quadro final |
+| **Database Name** | nome da base, sem espaços nem acentos (ex.: `minhaempresa`) |
+| **Email** | o login do administrador da base (pode ser o seu e-mail) |
+| **Password** | a senha do administrador — **anote**, é com ela que você vai entrar |
+| **Phone number** | opcional |
+| **Language** | `Portuguese (BR) / Português (BR)` |
+| **Country** | `Brazil` |
+| **Demo data** | **deixe desmarcado** (marcado, a base vem cheia de dados fictícios) |
+
+Clique em **Create database** e aguarde cerca de 1 minuto.
+
+### 5. Entre no Odoo
+
+Abra o endereço **Acesse**. Se houver mais de uma base, escolha qual abrir:
+
+<img src="screenshots/4-escolher-base.png" width="380" alt="Tela de escolha da base de dados">
+
+Entre com o e-mail e a senha que você definiu no formulário:
+
+<img src="screenshots/5-login.png" width="260" alt="Tela de login do Odoo em português">
+
+Pronto. A tela inicial mostra os aplicativos que você pode instalar (Vendas, Compras, Estoque,
+Contabilidade etc.):
+
+<img src="screenshots/6-aplicativos.png" width="700" alt="Tela de aplicativos do Odoo em português">
+
+> Os botões **Upgrade** são de recursos da versão paga (Enterprise), que não fazem parte desta
+> instalação. Use os aplicativos com o botão **Instalar**.
+
+---
+
+## Perguntas frequentes
+
+### Perdi as senhas. Como vejo de novo?
 
 ``` bash
 sudo cat odoo15-one/.credenciais
 ```
 
-**Firewall:** se o provedor tiver firewall de nuvem (ex.: DigitalOcean › Networking › Firewalls),
-libere a porta da instância — ou 80 e 443, no modo com domínio.
+### O que é o "Gerenciador de Bancos" e por que ele pede duas senhas?
 
-## Gerenciador de Bancos
+É a tela do Odoo para **criar, copiar, fazer backup, restaurar e excluir** bases de dados.
+Como ela dá acesso a todos os dados, tem duas proteções:
 
-Abra `…/web/database/manager`. O navegador pede **usuário e senha do proxy** (`gestor` e a senha
-gerada); em seguida, cada operação pede a **senha mestra** do Odoo. A tela de escolha de base, no
-login, continua livre para os usuários.
+1. o navegador pede **usuário e senha do proxy** (usuário `gestor`);
+2. cada operação pede a **senha mestra** do Odoo.
 
-No modo por IP, a conexão não é criptografada — use para testes. Em produção, use o modo com domínio.
+Os dois estão no quadro final e no arquivo `.credenciais`.
 
-## Várias instâncias na mesma máquina
+### Posso ter várias empresas/bases?
 
-Cada instância usa uma pasta e uma porta próprias:
+Sim. Crie quantas bases quiser no Gerenciador de Bancos. Na tela de login, cada usuário escolhe a base.
+
+### Posso instalar mais de um Odoo no mesmo servidor?
+
+Sim, com outra pasta e outra porta:
 
 ``` bash
-sudo bash instalar.sh odoo15-one 10015
 sudo bash instalar.sh odoo15-two 11015
 ```
 
-Apenas **uma** instância por servidor pode usar o modo com domínio, porque ele ocupa as portas 80 e 443.
+### Usar com domínio (HTTPS) — recomendado para uso real
 
-## Administração
-
-Dentro da pasta da instância:
+1. No seu provedor de domínio, crie um registro **tipo A** apontando, por exemplo,
+   `erp.seudominio.com.br` para o IP do servidor.
+2. No firewall do provedor de nuvem, libere as portas **80** e **443**.
+3. Instale assim:
 
 ``` bash
-sudo docker compose up -d          # iniciar
-sudo docker compose restart        # reiniciar
-sudo docker compose down           # parar
-sudo docker compose logs -f odoo15 # log do Odoo (também em etc/odoo-server.log)
-sudo docker compose logs -f proxy  # log do proxy / certificado HTTPS
+sudo DOMINIO=erp.seudominio.com.br bash instalar.sh odoo15-prod 10015
 ```
 
-## Backup e restauração
+O endereço passa a ser `https://erp.seudominio.com.br`, com certificado gratuito, emitido e
+renovado automaticamente. Só uma instalação por servidor pode usar domínio.
 
-Pelo navegador: Gerenciador de Bancos › *Backup* / *Restore*.
+### Quero já criar uma base na instalação
 
-Pelo console (útil para bases grandes ou rotinas automáticas):
+Acrescente o nome da base no final do comando:
+
+``` bash
+sudo bash instalar.sh odoo15-one 10015 minhaempresa
+```
+
+O quadro final mostra o usuário `admin` e a senha dessa base.
+
+### Como faço backup?
+
+Pelo navegador, no **Gerenciador de Bancos**:
+
+<img src="screenshots/3-gerenciador.png" width="380" alt="Gerenciador de Bancos com as opções Backup, Duplicate e Delete">
+
+| Botão | Para quê |
+|---|---|
+| **Backup** | baixa uma cópia da base (escolha o formato *zip*: inclui os anexos) |
+| **Duplicate** | cria uma cópia da base no servidor (útil para testes) |
+| **Delete** | exclui a base — **não tem volta** |
+| **Restore Database** | carrega um backup baixado antes |
+| **Set Master Password** | troca a senha mestra |
+
+Todas as operações pedem a senha mestra.
+
+### Como ligo, desligo ou reinicio?
+
+Dentro da pasta da instalação (`cd odoo15-one`):
+
+| Ação | Comando |
+|---|---|
+| Ligar | `sudo docker compose up -d` |
+| Desligar | `sudo docker compose down` |
+| Reiniciar | `sudo docker compose restart` |
+| Ver o que está acontecendo (log) | `sudo docker compose logs -f odoo15` |
+
+O Odoo volta a ligar sozinho se o servidor reiniciar.
+
+### Como instalo módulos extras (addons)?
+
+Copie as pastas dos módulos para `odoo15-one/addons/`, rode `sudo docker compose restart` e,
+no Odoo, vá em *Aplicativos › Atualizar lista de aplicativos*.
+
+---
+
+## Detalhes técnicos
+
+<details>
+<summary>Como a instalação é montada</summary>
+
+```
+navegador ──> proxy Caddy (porta da instância) ──> Odoo 15 ──> PostgreSQL 16
+```
+
+- Só o proxy recebe conexões de fora. Odoo e PostgreSQL ficam numa rede interna do Docker, sem portas publicadas.
+- O proxy encaminha o live chat (longpolling) e protege as rotas do Gerenciador de Bancos com `basic_auth`.
+- Com `DOMINIO`, o Caddy obtém e renova o certificado HTTPS (Let's Encrypt).
+- Senhas aleatórias geradas na instalação; o Odoo roda sem root; imagens fixadas por *digest* no `.env`.
+- Arquivos de cada instalação (não versionados): `.env`, `.credenciais`, `secrets/`, `etc/odoo.conf`, `proxy/`, `postgresql/`.
+
+</details>
+
+<details>
+<summary>Opções do instalador</summary>
+
+``` bash
+sudo bash instalar.sh <pasta> <porta> [base_inicial]
+```
+
+| Variável | Para quê |
+|---|---|
+| `DOMINIO=erp.exemplo.com.br` | publica com HTTPS automático |
+| `EMAIL=ti@exemplo.com.br` | contato para avisos do certificado (opcional) |
+| `POSTGRES_IMAGE=postgres:14` | usar PostgreSQL 14 (padrão: 16) |
+| `REF=<branch>` | instalar outra versão deste repositório |
+
+</details>
+
+<details>
+<summary>Backup e restauração pelo console (bases grandes)</summary>
 
 ``` bash
 cd odoo15-one
 sudo docker compose exec -T db pg_dump -U odoo -Fc NOME_DA_BASE > backup.dump
 sudo tar -czf filestore.tar.gz -C etc/filestore NOME_DA_BASE
 
-# restaurar
 sudo docker compose exec -T db createdb -U odoo NOME_DA_BASE
 sudo docker compose exec -T db pg_restore -U odoo -d NOME_DA_BASE --no-owner --no-privileges < backup.dump
 ```
 
-O PostgreSQL padrão é o 16; um dump gerado no 16 não pode ser restaurado num servidor 14.
-Para usar o 14, instale com `POSTGRES_IMAGE=postgres:14`.
+Um dump gerado no PostgreSQL 16 não pode ser restaurado num servidor 14.
 
-## Custom addons
+</details>
 
-Coloque os módulos na pasta `addons/` da instância e reinicie o Odoo.
-Pacotes Python extras: liste em `etc/requirements.txt` e descomente a linha do `entrypoint.sh` no `docker-compose.yml`.
+<details>
+<summary>Restringir a instalação a uma única base</summary>
 
-## Restringir uma instância a uma única base
+Em `etc/odoo.conf`, troque `list_db = True` por `list_db = False`, acrescente `dbfilter = ^nome_da_base$`
+e reinicie. O Gerenciador de Bancos deixa de funcionar nessa instalação.
 
-Em `etc/odoo.conf`, troque `list_db = True` por `list_db = False` e defina `dbfilter = ^nome_da_base$`.
-Reinicie o Odoo. O Gerenciador de Bancos deixa de funcionar nessa instância.
+</details>
 
-## Instalações feitas com versões anteriores deste repositório
+<details>
+<summary>Pacotes Python extras</summary>
+
+Liste os pacotes em `etc/requirements.txt` (ex.: `openupgradelib`, exigido pela localização brasileira
+da Trustcode), descomente a linha do `entrypoint.sh` no `docker-compose.yml` e reinicie.
+
+</details>
+
+<details>
+<summary>Instalações feitas com versões anteriores deste repositório</summary>
 
 - **Versão original:** a senha mestra era fixa e pública (continua visível no histórico do Git).
-  Troque `admin_passwd` em `etc/odoo.conf` e não publique as portas 8069/8072 do Odoo diretamente.
+  Troque `admin_passwd` em `etc/odoo.conf` e não deixe as portas do Odoo abertas diretamente.
 - **Versões com Nginx (outubro/2026):** continuam funcionando. Para migrar, faça backup das bases,
-  instale uma instância nova com esta versão e restaure as bases nela.
+  instale com esta versão e restaure.
 
-## Odoo 15 screenshots
-
-<img src="screenshots/odoo-15-welcome-screenshot.png" width="50%">
-
-<img src="screenshots/odoo-15-apps-screenshot.png" width="100%">
-
-<img src="screenshots/odoo-15-sales-screen.png" width="100%">
-
-<img src="screenshots/odoo-15-product-form.png" width="100%">
+</details>
