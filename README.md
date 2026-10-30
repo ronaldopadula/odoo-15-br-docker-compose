@@ -1,142 +1,167 @@
 # Em primeiro lugar:
 Fork criado apenas para utilização em demonstração. Tradução ao Português com todos os créditos ao criador do código.
 
-# Odoo 15 com Docker Compose — instalação simplificada e segura
+# Odoo 15 com Docker Compose — instalação simples, interfaces disponíveis e segura
 
-Instala uma instância do Odoo 15 com um comando. Suporta várias instâncias na mesma máquina, cada uma na sua pasta.
+Instala uma instância do Odoo 15 com um comando. Cada instância tem sua porta, atende várias bases
+de dados e oferece o **Gerenciador de Bancos** pelo navegador (criar, duplicar, fazer backup e
+restaurar bases). Suporta várias instâncias na mesma máquina.
 
 > **Aviso:** o Odoo 15 não recebe mais correções. O último commit do branch 15.0 do Odoo é de 14/10/2024,
 > e a imagem `odoo:15.0` foi retirada do repositório oficial de imagens (odoo/docker) em 07/10/2024.
-> Use atrás de HTTPS, com senhas fortes e acesso restrito.
+> Em produção, use sempre com domínio e HTTPS.
 
-## O que esta versão faz por segurança
+## Como funciona
 
-| Antes | Agora |
+```
+navegador ──> proxy Caddy (porta da instância) ──> Odoo ──> PostgreSQL
+```
+
+Só o proxy recebe conexões de fora. O Odoo e o PostgreSQL ficam numa rede interna do Docker.
+
+| Item | Como fica |
 |---|---|
-| Senha mestra fixa e publicada no repositório | senha mestra aleatória, gerada na instalação |
-| Senha do banco fixa no `docker-compose.yml` | senha aleatória em `secrets/db_password.txt` (docker secret) |
-| Gerenciador de bancos aberto (`/web/database/manager`) | `list_db = False` e `dbfilter` restrito à base da instância |
-| Porta do Odoo aberta para a internet | Odoo só em `127.0.0.1`; o instalador publica pelo Nginx (porta 80) e mostra o endereço |
-| `chmod -R 777` e contêineres como `root` | o Odoo roda como usuário `odoo`; arquivos com permissões restritas |
-| `dev_mode = reload` (modo de desenvolvimento) | modo de produção, com `workers` e `proxy_mode` |
-| Imagens sem versão fixa | o instalador grava o *digest* das imagens no `.env` |
-| Usuário `admin` com senha `admin` na base nova | senha aleatória para o `admin` |
-
-Nenhuma senha fica no repositório: `.env`, `secrets/`, `etc/odoo.conf` e `.credenciais` são gerados em cada
-instalação e estão no `.gitignore`.
+| Acesso | `http://IP:PORTA` (teste) ou `https://seu.dominio` com certificado automático (produção) |
+| Bases de dados | várias por instância; o usuário escolhe a base no login |
+| Gerenciador de Bancos | `…/web/database/manager`, protegido por **duas senhas**: a do proxy (usuário `gestor`) e a senha mestra do Odoo |
+| Live chat / notificações | encaminhados pelo proxy, sem porta extra |
+| Senhas | todas aleatórias, geradas na instalação e exibidas no final; nada fica no repositório |
+| Contêineres | Odoo roda sem root; sem `chmod 777`; imagens fixadas por *digest* |
 
 ## Requisitos
 
-- Linux com [Docker](https://docs.docker.com/engine/install/) e o plugin Compose (`docker compose`)
-- `git` e `openssl`
-- Nginx e Certbot, para publicar com HTTPS
+Linux com Docker e o plugin Compose. No Ubuntu, conforme a documentação oficial do Docker:
+
+``` bash
+sudo apt-get update && sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin git
+```
 
 ## Instalação
 
-Recomendado: baixe, leia e só então execute.
+Baixe o instalador, confira e execute:
 
 ``` bash
 curl -fsSLO https://raw.githubusercontent.com/ronaldopadula/odoo-15-br-docker-compose/master/instalar.sh
 less instalar.sh
-sudo bash instalar.sh odoo15-one 10015 20015 empresa
 ```
 
-Argumentos:
-* **odoo15-one**: pasta da instância
-* **10015**: porta local do Odoo
-* **20015**: porta local do live chat
-* **empresa** (opcional, padrão `odoo`): nome da base de dados criada
+**Teste, pelo IP do servidor:**
 
-Ao final, o instalador mostra o endereço de acesso, o usuário e a senha:
+``` bash
+sudo bash instalar.sh odoo15-one 10015
+```
+
+**Produção, com domínio e HTTPS automático** (o domínio deve apontar para o servidor, e as portas
+80 e 443 devem estar livres):
+
+``` bash
+sudo DOMINIO=erp.seudominio.com.br EMAIL=ti@seudominio.com.br bash instalar.sh odoo15-prod 10015
+```
+
+Argumentos: `<pasta> <porta> [base_inicial]`. Se informar `base_inicial`, a base já é criada, com senha
+aleatória para o usuário `admin`. Sem ela, crie as bases pelo Gerenciador de Bancos.
+
+Ao final, o instalador mostra tudo o que é preciso:
 
 ```
 ==============================================================
  Odoo 15 pronto
-   Acesse:  http://IP_DO_SERVIDOR
-   Usuário: admin
-   Senha:   (gerada na instalação)
+
+   Acesse:                http://IP:10015
+   Gerenciador de Bancos: http://IP:10015/web/database/manager
+     usuário do proxy:    gestor
+     senha do proxy:      (gerada)
+     senha mestra:        (gerada)
 ==============================================================
 ```
 
-Para isso ele instala o Nginx (se necessário), publica a instância na porta 80 e libera a porta
-no `ufw`. Se o navegador não abrir, verifique se o firewall de nuvem do provedor permite a porta.
-Todas as senhas, inclusive a senha mestra, ficam em `odoo15-one/.credenciais`, legível só pelo root:
+Esses dados ficam guardados em `<pasta>/.credenciais` (só o root lê):
 
 ``` bash
 sudo cat odoo15-one/.credenciais
 ```
 
-**Segunda instância na mesma máquina:** a porta 80 já estará em uso pela primeira. Use outra pasta,
-outras portas internas e uma porta pública diferente:
+**Firewall:** se o provedor tiver firewall de nuvem (ex.: DigitalOcean › Networking › Firewalls),
+libere a porta da instância — ou 80 e 443, no modo com domínio.
+
+## Gerenciador de Bancos
+
+Abra `…/web/database/manager`. O navegador pede **usuário e senha do proxy** (`gestor` e a senha
+gerada); em seguida, cada operação pede a **senha mestra** do Odoo. A tela de escolha de base, no
+login, continua livre para os usuários.
+
+No modo por IP, a conexão não é criptografada — use para testes. Em produção, use o modo com domínio.
+
+## Várias instâncias na mesma máquina
+
+Cada instância usa uma pasta e uma porta próprias:
 
 ``` bash
-sudo PORTA_PUBLICA=8099 bash instalar.sh odoo15-two 11015 21015 outraempresa
+sudo bash instalar.sh odoo15-one 10015
+sudo bash instalar.sh odoo15-two 11015
 ```
 
-O acesso fica em `http://IP_DO_SERVIDOR:8099`.
-
-## Acesso
-
-O Odoo atende só em `127.0.0.1`; quem o publica é o Nginx, configurado pelo instalador.
-
-**HTTPS (recomendado para uso real):** aponte um domínio para o servidor e rode
-`certbot --nginx -d SEU_DOMINIO --redirect`. Acesse por `https://SEU_DOMINIO`.
-O modelo [`nginx/odoo.conf.example`](nginx/odoo.conf.example) serve para configurar à mão.
-
-**Sem publicar na internet:** instale com `PORTA_PUBLICA=0` e acesse por túnel SSH,
-abrindo `http://localhost:10015` no navegador:
-
-``` bash
-ssh -L 10015:127.0.0.1:10015 usuario@IP_DO_SERVIDOR
-```
+Apenas **uma** instância por servidor pode usar o modo com domínio, porque ele ocupa as portas 80 e 443.
 
 ## Administração
 
 Dentro da pasta da instância:
 
 ``` bash
-sudo docker compose up -d        # iniciar
-sudo docker compose restart      # reiniciar
-sudo docker compose down         # parar
-sudo docker compose logs -f odoo15
+sudo docker compose up -d          # iniciar
+sudo docker compose restart        # reiniciar
+sudo docker compose down           # parar
+sudo docker compose logs -f odoo15 # log do Odoo (também em etc/odoo-server.log)
+sudo docker compose logs -f proxy  # log do proxy / certificado HTTPS
 ```
 
-O log do Odoo também fica em `etc/odoo-server.log`.
+## Backup e restauração
 
-## Restaurar uma base existente (dump)
+Pelo navegador: Gerenciador de Bancos › *Backup* / *Restore*.
 
-Instale sem criar base, informando o nome da base que será restaurada:
+Pelo console (útil para bases grandes ou rotinas automáticas):
 
 ``` bash
-sudo CRIAR_BASE=0 bash instalar.sh minha-instancia 10015 20015 nome_da_base
-cd minha-instancia
-sudo docker compose stop odoo15
-sudo docker compose exec -T db createdb -U odoo nome_da_base
-sudo docker compose exec -T db pg_restore -U odoo -d nome_da_base --no-owner --no-privileges < /caminho/backup.dump
-sudo docker compose start odoo15
+cd odoo15-one
+sudo docker compose exec -T db pg_dump -U odoo -Fc NOME_DA_BASE > backup.dump
+sudo tar -czf filestore.tar.gz -C etc/filestore NOME_DA_BASE
+
+# restaurar
+sudo docker compose exec -T db createdb -U odoo NOME_DA_BASE
+sudo docker compose exec -T db pg_restore -U odoo -d NOME_DA_BASE --no-owner --no-privileges < backup.dump
 ```
 
-Os anexos (filestore) vão para `etc/filestore/nome_da_base/`, com o mesmo dono da pasta `etc`.
-
-O PostgreSQL padrão é o 16. Um dump gerado no 16 não pode ser restaurado num servidor 14.
-Para manter o 14, instale com `POSTGRES_IMAGE=postgres:14`.
+O PostgreSQL padrão é o 16; um dump gerado no 16 não pode ser restaurado num servidor 14.
+Para usar o 14, instale com `POSTGRES_IMAGE=postgres:14`.
 
 ## Custom addons
 
-Coloque os módulos próprios na pasta `addons/` da instância e reinicie o Odoo.
+Coloque os módulos na pasta `addons/` da instância e reinicie o Odoo.
 Pacotes Python extras: liste em `etc/requirements.txt` e descomente a linha do `entrypoint.sh` no `docker-compose.yml`.
 
-## Instalações feitas com a versão anterior deste repositório
+## Restringir uma instância a uma única base
 
-A versão anterior publicava a senha mestra no próprio repositório, e ela continua visível no histórico do Git.
-Em toda instância já instalada:
+Em `etc/odoo.conf`, troque `list_db = True` por `list_db = False` e defina `dbfilter = ^nome_da_base$`.
+Reinicie o Odoo. O Gerenciador de Bancos deixa de funcionar nessa instância.
 
-1. **Troque já a senha mestra** (`admin_passwd`) em `etc/odoo.conf` e reinicie o Odoo.
-2. Acrescente `list_db = False` e `dbfilter = ^nome_da_base$` ao `etc/odoo.conf`.
-3. No `docker-compose.yml`, troque `"10015:8069"` por `"127.0.0.1:10015:8069"` (idem para a porta do chat)
-   e publique pelo Nginx com HTTPS.
-4. Troque a senha do PostgreSQL e remova o `chmod 777` das pastas.
-5. Mantenha `postgres:14` nessas instâncias: os dados de um PostgreSQL 14 não abrem diretamente no 16.
+## Instalações feitas com versões anteriores deste repositório
+
+- **Versão original:** a senha mestra era fixa e pública (continua visível no histórico do Git).
+  Troque `admin_passwd` em `etc/odoo.conf` e não publique as portas 8069/8072 do Odoo diretamente.
+- **Versões com Nginx (outubro/2026):** continuam funcionando. Para migrar, faça backup das bases,
+  instale uma instância nova com esta versão e restaure as bases nela.
 
 ## Odoo 15 screenshots
 

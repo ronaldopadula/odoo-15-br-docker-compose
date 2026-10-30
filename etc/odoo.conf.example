@@ -10,19 +10,21 @@ data_dir = /etc/odoo
 logfile = /etc/odoo/odoo-server.log
 log_level = info
 
-; Senha mestra (gerenciador de bancos). Gerada aleatoriamente na instalação.
+; Senha mestra do Gerenciador de Bancos. Gerada aleatoriamente na instalação.
 admin_passwd = __ADMIN_PASSWD__
 
-; Segurança: sem lista nem gerenciador de bancos pela web; o Odoo atende
-; apenas a base definida abaixo.
-list_db = False
-dbfilter = __DBFILTER__
+; Várias bases por instância: a tela de login permite escolher a base, e o
+; Gerenciador de Bancos (/web/database/manager) fica disponível. As operações
+; do gerenciador são protegidas também por usuário e senha no proxy (Caddy).
+list_db = True
+; Para restringir a instância a uma base:  dbfilter = ^nome_da_base$
+; dbfilter = .*
 
-; Atrás de um proxy reverso (Nginx). Necessário para HTTPS e IP real do cliente.
+; Atrás de um proxy reverso (Caddy). Necessário para HTTPS e IP real do cliente.
 proxy_mode = True
 
 ; Modo de produção com processos separados. Com workers > 0 o live chat e as
-; notificações usam a porta 8072 (longpolling), publicada pelo docker-compose.
+; notificações usam a porta interna 8072 (longpolling), encaminhada pelo proxy.
 workers = 2
 max_cron_threads = 1
 limit_memory_soft = 805306368

@@ -1,0 +1,8 @@
+# Acrescentado automaticamente quando a instância é instalada com DOMINIO=...
+# (via COMPOSE_FILE no .env). O Caddy obtém e renova o certificado HTTPS
+# sozinho; para isso as portas 80 e 443 precisam estar livres e liberadas
+# no firewall, e o domínio precisa apontar para este servidor.
+services:
+  proxy:
+    ports:
+      - "443:443"
