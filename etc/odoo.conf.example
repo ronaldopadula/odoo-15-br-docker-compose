@@ -24,7 +24,7 @@ list_db = True
 proxy_mode = True
 
 ; Modo de produção com processos separados. Com workers > 0 o live chat e as
-; notificações usam a porta interna 8072 (longpolling no 14/15, websocket no 16/18),
+; notificações usam a porta interna 8072 (longpolling no 14/15, websocket do 16 em diante),
 ; encaminhada pelo proxy.
 workers = 2
 max_cron_threads = 1
