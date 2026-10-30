@@ -3,66 +3,64 @@
 #  Instala uma instância do Odoo 15 com Docker Compose.
 #
 #  Uso:
-#    sudo ./instalar.sh <pasta> <porta> <porta_chat> [nome_da_base]
+#    sudo bash instalar.sh <pasta> <porta> [base_inicial]
 #
-#  Exemplo:
-#    sudo ./instalar.sh odoo15-one 10015 20015 empresa
+#  Exemplos:
+#    sudo bash instalar.sh odoo15-one 10015                 # acesso: http://IP:10015
+#    sudo bash instalar.sh odoo15-two 11015 empresa         # já cria a base "empresa"
+#    sudo DOMINIO=erp.exemplo.com.br bash instalar.sh odoo15-prod 10015
+#                                                           # acesso: https://erp.exemplo.com.br
 #
-#  - Gera senhas aleatórias (banco, senha mestra, usuário admin) e as guarda
-#    em <pasta>/.credenciais, legível só pelo root.
-#  - O Odoo escuta só em 127.0.0.1; o instalador configura o Nginx para
-#    publicá-lo em http://IP_DO_SERVIDOR (porta 80) e mostra o acesso no final.
+#  - Cada instância tem uma porta própria e atende várias bases (seleção no login).
+#  - Gerenciador de Bancos disponível pelo navegador, protegido por usuário e
+#    senha do proxy e pela senha mestra do Odoo (ambas geradas na instalação).
+#  - O Odoo e o PostgreSQL não ficam expostos; só o proxy (Caddy) recebe conexões.
+#  - Com DOMINIO=..., o Caddy emite e renova o certificado HTTPS sozinho
+#    (o domínio deve apontar para o servidor e as portas 80/443 devem estar livres).
 #  - Variáveis opcionais:
-#      PORTA_PUBLICA=8099  publica em outra porta (ex.: segunda instância)
-#      PORTA_PUBLICA=0     não configura o Nginx (acesso só por túnel SSH)
-#      CRIAR_BASE=0        não cria base nova (ex.: para restaurar um dump)
-#      REF=<branch|tag>    versão deste repositório a usar (padrão: master)
-#      ODOO_IMAGE / POSTGRES_IMAGE   imagens (padrão: odoo:15.0 / postgres:16)
+#      DOMINIO=<domínio>   publica com HTTPS automático (uso em produção)
+#      EMAIL=<e-mail>      contato para o Let's Encrypt (opcional, com DOMINIO)
+#      REF=<branch|tag>    versão deste repositório (padrão: master)
+#      ODOO_IMAGE / POSTGRES_IMAGE / CADDY_IMAGE   imagens (padrão: odoo:15.0 / postgres:16 / caddy:2)
 # =============================================================================
 set -euo pipefail
 
-DESTINO="${1:-}"; PORTA="${2:-}"; CHAT="${3:-}"; BASE="${4:-odoo}"
+DESTINO="${1:-}"; PORTA="${2:-}"; BASE="${3:-}"
+# Compatibilidade com a forma antiga: <pasta> <porta> <porta_chat> [base]
+if [[ "$BASE" =~ ^[0-9]+$ ]]; then
+  echo "Aviso: a porta de chat ($BASE) não é mais necessária e foi ignorada."
+  BASE="${4:-}"
+fi
+DOMINIO="${DOMINIO:-}"
+EMAIL="${EMAIL:-}"
 REPO="${REPO:-https://github.com/ronaldopadula/odoo-15-br-docker-compose}"
 REF="${REF:-master}"
-CRIAR_BASE="${CRIAR_BASE:-1}"
 ODOO_IMAGE="${ODOO_IMAGE:-odoo:15.0}"
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:16}"
-PORTA_PUBLICA="${PORTA_PUBLICA:-80}"
+CADDY_IMAGE="${CADDY_IMAGE:-caddy:2}"
 
-uso() { sed -n '2,20p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 1; }
+uso() { sed -n '2,26p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 1; }
 erro() { echo "ERRO: $*" >&2; exit 1; }
+porta_ocupada() { ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1\$"; }
 
-[ -n "$DESTINO" ] && [ -n "$PORTA" ] && [ -n "$CHAT" ] || uso
+[ -n "$DESTINO" ] && [ -n "$PORTA" ] || uso
 [ "$(id -u)" -eq 0 ] || erro "rode com sudo."
-[[ "$PORTA" =~ ^[0-9]+$ && "$CHAT" =~ ^[0-9]+$ ]] || erro "portas devem ser numéricas."
-[ "$PORTA" -ge 1024 ] && [ "$PORTA" -le 65535 ] && [ "$CHAT" -ge 1024 ] && [ "$CHAT" -le 65535 ] || erro "use portas entre 1024 e 65535."
-[ "$PORTA" != "$CHAT" ] || erro "as duas portas devem ser diferentes."
-[[ "$BASE" =~ ^[a-zA-Z0-9_]+$ ]] || erro "nome da base: use só letras, números e _."
+[[ "$PORTA" =~ ^[0-9]+$ ]] && [ "$PORTA" -ge 1024 ] && [ "$PORTA" -le 65535 ] || erro "use uma porta entre 1024 e 65535."
+[ -z "$BASE" ] || [[ "$BASE" =~ ^[a-zA-Z0-9_]+$ ]] || erro "nome da base: use só letras, números e _."
 [ ! -e "$DESTINO" ] || erro "a pasta $DESTINO já existe."
-for p in "$PORTA" "$CHAT"; do
-  if ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$p\$"; then erro "a porta $p já está em uso."; fi
-done
+porta_ocupada "$PORTA" && erro "a porta $PORTA já está em uso."
+if [ -n "$DOMINIO" ]; then
+  [[ "$DOMINIO" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]] || erro "domínio inválido: $DOMINIO"
+  for p in 80 443; do
+    porta_ocupada "$p" && erro "a porta $p já está em uso; com DOMINIO, as portas 80 e 443 precisam estar livres."
+  done
+fi
 
 command -v docker >/dev/null || erro "Docker não encontrado: https://docs.docker.com/engine/install/"
 if docker compose version >/dev/null 2>&1; then DC=(docker compose)
 elif command -v docker-compose >/dev/null; then DC=(docker-compose)
 else erro "Docker Compose não encontrado."; fi
 command -v openssl >/dev/null || erro "openssl não encontrado."
-if [ "$PORTA_PUBLICA" != "0" ]; then
-  [[ "$PORTA_PUBLICA" =~ ^[0-9]+$ ]] || erro "PORTA_PUBLICA deve ser numérica."
-  for p in "$PORTA" "$CHAT"; do [ "$PORTA_PUBLICA" != "$p" ] || erro "PORTA_PUBLICA deve ser diferente das portas internas."; done
-  # Porta pública ocupada por outro programa (que não o Nginx)?
-  if ss -ltnp 2>/dev/null | awk '{print $4, $6}' | grep -E "[:.]$PORTA_PUBLICA " | grep -vq nginx; then
-    erro "a porta $PORTA_PUBLICA já está em uso por outro programa. Use PORTA_PUBLICA=<outra porta> ou PORTA_PUBLICA=0."
-  fi
-  # Porta pública já usada por outro site do Nginx (exceto a página padrão)?
-  if [ -d /etc/nginx/sites-enabled ] && \
-     grep -lsE "listen +(\[::\]:)?$PORTA_PUBLICA( |;)" /etc/nginx/sites-enabled/* | grep -v '/default$' | grep -q .; then
-    erro "o Nginx já publica outro site na porta $PORTA_PUBLICA. Use PORTA_PUBLICA=<outra porta>, ex.: PORTA_PUBLICA=8099."
-  fi
-  command -v nginx >/dev/null || command -v apt-get >/dev/null || \
-    erro "Nginx não encontrado e não há apt-get para instalá-lo. Instale o Nginx ou use PORTA_PUBLICA=0."
-fi
 command -v git >/dev/null || erro "git não encontrado."
 
 gerar() { openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-"$1"; }
@@ -74,19 +72,25 @@ cd "$DESTINO"
 
 echo ">> Gerando senhas e configuração"
 umask 077
-mkdir -p postgresql secrets addons
+mkdir -p postgresql secrets addons proxy/data proxy/config
 gerar 32 > secrets/db_password.txt
 SENHA_MESTRA=$(gerar 24)
-sed -e "s|__ADMIN_PASSWD__|$SENHA_MESTRA|" -e "s|__DBFILTER__|^${BASE}\$|" \
-    etc/odoo.conf.example > etc/odoo.conf
+GESTOR_USUARIO="gestor"
+GESTOR_SENHA=$(gerar 20)
+sed -e "s|__ADMIN_PASSWD__|$SENHA_MESTRA|" etc/odoo.conf.example > etc/odoo.conf
 PROJETO=$(basename "$DESTINO" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9\n_-' '_')
-cat > .env <<EOF
-COMPOSE_PROJECT_NAME=$PROJETO
-ODOO_PORT=$PORTA
-CHAT_PORT=$CHAT
-ODOO_IMAGE=$ODOO_IMAGE
-POSTGRES_IMAGE=$POSTGRES_IMAGE
-EOF
+{
+  echo "COMPOSE_PROJECT_NAME=$PROJETO"
+  if [ -n "$DOMINIO" ]; then
+    echo "COMPOSE_FILE=docker-compose.yml:docker-compose.https.yml"
+    echo "HTTP_PORT=80"
+  else
+    echo "HTTP_PORT=$PORTA"
+  fi
+  echo "ODOO_IMAGE=$ODOO_IMAGE"
+  echo "POSTGRES_IMAGE=$POSTGRES_IMAGE"
+  echo "CADDY_IMAGE=$CADDY_IMAGE"
+} > .env
 umask 022
 
 echo ">> Ajuste do sistema (inotify, para várias instâncias)"
@@ -95,21 +99,57 @@ sysctl -q -p /etc/sysctl.d/90-odoo-inotify.conf || true
 
 echo ">> Baixando as imagens e fixando as versões (digest)"
 "${DC[@]}" pull -q </dev/null
-for var in ODOO_IMAGE POSTGRES_IMAGE; do
+for var in ODOO_IMAGE POSTGRES_IMAGE CADDY_IMAGE; do
   img=$(grep "^$var=" .env | cut -d= -f2-)
   dig=$(docker image inspect --format '{{index .RepoDigests 0}}' "$img" 2>/dev/null || true)
   [ -n "$dig" ] && sed -i "s|^$var=.*|$var=$dig|" .env
 done
+IMG_ODOO=$(grep '^ODOO_IMAGE=' .env | cut -d= -f2-)
+IMG_CADDY=$(grep '^CADDY_IMAGE=' .env | cut -d= -f2-)
+
+echo ">> Configurando o proxy (Caddy)"
+# A senha vai pela entrada padrão (duas vezes: senha e confirmação), não pela linha de comando.
+GESTOR_HASH=$(printf '%s\n%s\n' "$GESTOR_SENHA" "$GESTOR_SENHA" | docker run --rm -i "$IMG_CADDY" caddy hash-password 2>/dev/null | tail -1)
+[[ "$GESTOR_HASH" == \$2* ]] || erro "não foi possível gerar o hash da senha do gerenciador."
+ENDERECO=":80"; [ -n "$DOMINIO" ] && ENDERECO="$DOMINIO"
+cat > proxy/Caddyfile <<EOF
+# Gerado pelo instalar.sh — instância $DESTINO
+{
+	admin off
+	${EMAIL:+email $EMAIL}
+}
+
+$ENDERECO {
+	encode gzip
+
+	# Gerenciador de Bancos: exige o usuário e a senha abaixo (proxy) e,
+	# depois, a senha mestra do Odoo. A escolha da base no login fica livre.
+	@gestor path /web/database/manager /web/database/create /web/database/duplicate /web/database/drop /web/database/backup /web/database/restore /web/database/change_password /xmlrpc/db /xmlrpc/2/db
+	basic_auth @gestor {
+		$GESTOR_USUARIO $GESTOR_HASH
+	}
+
+	handle /longpolling/* {
+		reverse_proxy odoo15:8072
+	}
+	handle {
+		reverse_proxy odoo15:8069
+	}
+}
+EOF
+docker run --rm -v "$PWD/proxy/Caddyfile:/etc/caddy/Caddyfile:ro" "$IMG_CADDY" \
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 \
+  || erro "configuração do proxy inválida (proxy/Caddyfile)."
 
 echo ">> Permissões (sem 777; o Odoo roda sem root)"
-OUID=$(docker run --rm --entrypoint id "$(grep '^ODOO_IMAGE=' .env | cut -d= -f2-)" -u)
-OGID=$(docker run --rm --entrypoint id "$(grep '^ODOO_IMAGE=' .env | cut -d= -f2-)" -g)
+OUID=$(docker run --rm --entrypoint id "$IMG_ODOO" -u)
+OGID=$(docker run --rm --entrypoint id "$IMG_ODOO" -g)
 chown -R "$OUID:$OGID" etc addons secrets/db_password.txt
 chmod 750 etc addons
 chmod 640 etc/odoo.conf
 chmod 400 secrets/db_password.txt
 chmod 700 secrets
-chmod 600 .env
+chmod 600 .env proxy/Caddyfile
 
 echo ">> Iniciando o PostgreSQL"
 "${DC[@]}" up -d db </dev/null
@@ -120,7 +160,7 @@ done
 "${DC[@]}" exec -T db pg_isready -U odoo -q </dev/null || erro "o PostgreSQL não respondeu."
 
 SENHA_ADMIN=""
-if [ "$CRIAR_BASE" = "1" ]; then
+if [ -n "$BASE" ]; then
   echo ">> Criando a base '$BASE' (sem dados de demonstração, em português)"
   "${DC[@]}" run --rm -T odoo15 odoo -d "$BASE" -i base --without-demo=all \
       --load-language=pt_BR --stop-after-init --no-http </dev/null
@@ -129,82 +169,60 @@ if [ "$CRIAR_BASE" = "1" ]; then
     | "${DC[@]}" run --rm -T odoo15 odoo shell -d "$BASE" --no-http >/dev/null
 fi
 
-echo ">> Iniciando o Odoo"
+echo ">> Iniciando o Odoo e o proxy"
 "${DC[@]}" up -d </dev/null
 
-URL="http://127.0.0.1:$PORTA"
-if [ "$PORTA_PUBLICA" != "0" ]; then
-  echo ">> Publicando pelo Nginx na porta $PORTA_PUBLICA"
-  if ! command -v nginx >/dev/null; then
-    { apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q nginx; } </dev/null >/dev/null
-  fi
-  SITE="/etc/nginx/sites-available/odoo-$PROJETO"
-  LISTEN6=""; [ -f /proc/net/if_inet6 ] && LISTEN6="listen [::]:$PORTA_PUBLICA;"
-  cat > "$SITE" <<EOF
-# Odoo 15 — instância $DESTINO (gerado pelo instalar.sh)
-server {
-  listen $PORTA_PUBLICA;
-  $LISTEN6
-  server_name _;
-  client_max_body_size 200m;
-  proxy_read_timeout 720s;
-  proxy_connect_timeout 720s;
-  proxy_send_timeout 720s;
-  proxy_set_header Host \$http_host;
-  proxy_set_header X-Forwarded-Host \$http_host;
-  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-  proxy_set_header X-Forwarded-Proto \$scheme;
-  proxy_set_header X-Real-IP \$remote_addr;
-  location ~ ^/web/database/ { return 403; }
-  location /longpolling { proxy_pass http://127.0.0.1:$CHAT; }
-  location / { proxy_redirect off; proxy_pass http://127.0.0.1:$PORTA; }
-}
-EOF
-  [ "$PORTA_PUBLICA" = "80" ] && rm -f /etc/nginx/sites-enabled/default
-  ln -sf "$SITE" /etc/nginx/sites-enabled/
-  nginx -t -q || erro "configuração do Nginx inválida ($SITE)."
-  systemctl enable --now nginx >/dev/null 2>&1 || true
-  systemctl reload nginx 2>/dev/null || nginx -s reload
-  if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
-    ufw allow "$PORTA_PUBLICA/tcp" >/dev/null
-  fi
+if [ -n "$DOMINIO" ]; then
+  URL="https://$DOMINIO"
+  TESTE=(curl -sk --resolve "$DOMINIO:443:127.0.0.1" -o /dev/null -w '%{http_code}' "$URL/web/database/selector")
+else
   IP=$(curl -fsS --max-time 3 http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address 2>/dev/null \
        || hostname -I | awk '{print $1}')
-  URL="http://$IP"; [ "$PORTA_PUBLICA" != "80" ] && URL="$URL:$PORTA_PUBLICA"
+  URL="http://$IP:$PORTA"
+  TESTE=(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORTA/web/database/selector")
 fi
 
 echo ">> Aguardando o Odoo responder"
 ok=0
 for _ in $(seq 1 90); do
-  if curl -fs -o /dev/null "http://127.0.0.1:$PORTA/web/login"; then ok=1; break; fi
+  [ "$("${TESTE[@]}" 2>/dev/null || true)" = "200" ] && { ok=1; break; }
   sleep 2
 done
 
 umask 077
-cat > .credenciais <<EOF
-Instância: $DESTINO   (gerado em $(date '+%F %T'))
-Acesso: $URL
-Base de dados: $BASE
-Senha mestra (admin_passwd): $SENHA_MESTRA
-EOF
-if [ -n "$SENHA_ADMIN" ]; then
-  printf 'Usuário: admin\nSenha do admin: %s\n' "$SENHA_ADMIN" >> .credenciais
-fi
-echo "Senha do PostgreSQL: arquivo secrets/db_password.txt" >> .credenciais
+{
+  echo "Instância: $DESTINO   (gerado em $(date '+%F %T'))"
+  echo "Acesso: $URL"
+  echo "Gerenciador de Bancos: $URL/web/database/manager"
+  echo "  1º usuário/senha (proxy): $GESTOR_USUARIO / $GESTOR_SENHA"
+  echo "  2º senha mestra (Odoo):   $SENHA_MESTRA"
+  if [ -n "$BASE" ]; then
+    echo "Base inicial: $BASE   usuário: admin   senha: $SENHA_ADMIN"
+  fi
+  echo "Senha do PostgreSQL: arquivo secrets/db_password.txt"
+} > .credenciais
 umask 022
 
 echo
 echo "=============================================================="
 if [ "$ok" = "1" ]; then echo " Odoo 15 pronto"; else echo " Odoo 15 iniciado (ainda carregando; aguarde 1 minuto)"; fi
-echo "   Acesse:  $URL"
-if [ -n "$SENHA_ADMIN" ]; then
-  echo "   Usuário: admin"
-  echo "   Senha:   $SENHA_ADMIN"
+echo
+echo "   Acesse:                $URL"
+echo "   Gerenciador de Bancos: $URL/web/database/manager"
+echo "     usuário do proxy:    $GESTOR_USUARIO"
+echo "     senha do proxy:      $GESTOR_SENHA"
+echo "     senha mestra:        $SENHA_MESTRA"
+if [ -n "$BASE" ]; then
+  echo "   Base '$BASE':  usuário admin / senha $SENHA_ADMIN"
 fi
-echo "   Senha mestra e demais dados: sudo cat $(pwd)/.credenciais"
+echo
+echo "   Tudo isso fica guardado em: $(pwd)/.credenciais"
 echo "=============================================================="
-if [ "$PORTA_PUBLICA" != "0" ]; then
-  echo "Acesso por HTTP. Para HTTPS, aponte um domínio para este servidor e rode:"
-  echo "   certbot --nginx -d SEU_DOMINIO --redirect"
-  echo "Se o navegador não abrir, verifique o firewall de nuvem do provedor (porta $PORTA_PUBLICA)."
+if [ -z "$DOMINIO" ]; then
+  echo "Acesso por HTTP, sem criptografia: use para testes. Para produção,"
+  echo "reinstale com DOMINIO=seu.dominio (HTTPS automático)."
+  echo "Libere a porta $PORTA no firewall de nuvem do provedor, se houver."
+else
+  echo "Libere as portas 80 e 443 no firewall de nuvem do provedor, se houver."
+  [ "$ok" = "1" ] || echo "Se o HTTPS não abrir, confira se $DOMINIO aponta para este servidor: sudo docker compose logs proxy"
 fi

@@ -3,6 +3,7 @@
 .credenciais
 secrets/
 postgresql/
+proxy/
 etc/odoo.conf
 etc/odoo-server.log
 etc/addons/
