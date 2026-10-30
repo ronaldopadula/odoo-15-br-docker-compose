@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  Instala uma instância do Odoo (versão 14, 15, 16 ou 18) com Docker Compose.
+#  Instala uma instância do Odoo (versão 14 a 19) com Docker Compose.
 #
 #  Uso:
-#    sudo [VERSAO=14|15|16|18] bash instalar.sh <pasta> <porta> [base_inicial]
+#    sudo [VERSAO=14|15|16|17|18|19] bash instalar.sh <pasta> <porta> [base_inicial]
 #
 #  Exemplos:
 #    sudo bash instalar.sh odoo15-one 10015                 # Odoo 15 em http://IP:10015
+#    sudo VERSAO=19 bash instalar.sh odoo19 10019           # Odoo 19 em http://IP:10019
 #    sudo VERSAO=18 bash instalar.sh odoo18 10018           # Odoo 18 em http://IP:10018
 #    sudo VERSAO=16 bash instalar.sh odoo16 10016           # Odoo 16 em http://IP:10016
 #    sudo VERSAO=14 bash instalar.sh odoo14 10014 empresa   # Odoo 14, já cria a base "empresa"
@@ -21,7 +22,7 @@
 #  - Com DOMINIO=..., o Caddy emite e renova o certificado HTTPS sozinho
 #    (o domínio deve apontar para o servidor e as portas 80/443 devem estar livres).
 #  - Variáveis opcionais:
-#      VERSAO=14|15|16|18  versão do Odoo (padrão: 15)
+#      VERSAO=14 a 19      versão do Odoo (padrão: 15)
 #      DOMINIO=<domínio>   publica com HTTPS automático (uso em produção)
 #      EMAIL=<e-mail>      contato para o Let's Encrypt (opcional, com DOMINIO)
 #      REF=<branch|tag>    versão deste repositório (padrão: master)
@@ -45,13 +46,13 @@ ODOO_IMAGE="${ODOO_IMAGE:-odoo:$VERSAO.0}"
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-}"   # vazio: escolhido conforme a imagem do Odoo
 CADDY_IMAGE="${CADDY_IMAGE:-caddy:2}"
 
-uso() { sed -n '2,30p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 1; }
+uso() { sed -n '2,31p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 1; }
 erro() { echo "ERRO: $*" >&2; exit 1; }
 porta_ocupada() { ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1\$"; }
 
 [ -n "$DESTINO" ] && [ -n "$PORTA" ] || uso
 [ "$(id -u)" -eq 0 ] || erro "rode com sudo."
-case "$VERSAO" in 14|15|16|18) ;; *) erro "VERSAO deve ser 14, 15, 16 ou 18." ;; esac
+case "$VERSAO" in 14|15|16|17|18|19) ;; *) erro "VERSAO deve ser 14, 15, 16, 17, 18 ou 19." ;; esac
 [[ "$PORTA" =~ ^[0-9]+$ ]] && [ "$PORTA" -ge 1024 ] && [ "$PORTA" -le 65535 ] || erro "use uma porta entre 1024 e 65535."
 [ -z "$BASE" ] || [[ "$BASE" =~ ^[a-zA-Z0-9_]+$ ]] || erro "nome da base: use só letras, números e _."
 [ ! -e "$DESTINO" ] || erro "a pasta $DESTINO já existe."
@@ -180,7 +181,7 @@ $ENDERECO {
 		$GESTOR_USUARIO $GESTOR_HASH
 	}
 
-	# Live chat e notificações: /longpolling (Odoo 14 e 15) e /websocket (Odoo 16 e 18).
+	# Live chat e notificações: /longpolling (Odoo 14 e 15) e /websocket (Odoo 16 em diante).
 	handle /longpolling/* {
 		reverse_proxy odoo:8072
 	}
