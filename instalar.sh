@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  Instala uma instância do Odoo 15 com Docker Compose.
+#  Instala uma instância do Odoo (versão 14, 15 ou 16) com Docker Compose.
 #
 #  Uso:
-#    sudo bash instalar.sh <pasta> <porta> [base_inicial]
+#    sudo [VERSAO=14|15|16] bash instalar.sh <pasta> <porta> [base_inicial]
 #
 #  Exemplos:
-#    sudo bash instalar.sh odoo15-one 10015                 # acesso: http://IP:10015
-#    sudo bash instalar.sh odoo15-two 11015 empresa         # já cria a base "empresa"
+#    sudo bash instalar.sh odoo15-one 10015                 # Odoo 15 em http://IP:10015
+#    sudo VERSAO=16 bash instalar.sh odoo16 10016           # Odoo 16 em http://IP:10016
+#    sudo VERSAO=14 bash instalar.sh odoo14 10014 empresa   # Odoo 14, já cria a base "empresa"
 #    sudo DOMINIO=erp.exemplo.com.br bash instalar.sh odoo15-prod 10015
 #                                                           # acesso: https://erp.exemplo.com.br
 #
@@ -19,10 +20,12 @@
 #  - Com DOMINIO=..., o Caddy emite e renova o certificado HTTPS sozinho
 #    (o domínio deve apontar para o servidor e as portas 80/443 devem estar livres).
 #  - Variáveis opcionais:
+#      VERSAO=14|15|16     versão do Odoo (padrão: 15)
 #      DOMINIO=<domínio>   publica com HTTPS automático (uso em produção)
 #      EMAIL=<e-mail>      contato para o Let's Encrypt (opcional, com DOMINIO)
 #      REF=<branch|tag>    versão deste repositório (padrão: master)
-#      ODOO_IMAGE / POSTGRES_IMAGE / CADDY_IMAGE   imagens (padrão: odoo:15.0 / postgres:16 / caddy:2)
+#      ODOO_IMAGE / POSTGRES_IMAGE / CADDY_IMAGE   imagens (padrão: odoo:<VERSAO>.0 /
+#                          PostgreSQL compatível com a imagem do Odoo, até o 16 / caddy:2)
 # =============================================================================
 set -euo pipefail
 
@@ -32,20 +35,22 @@ if [[ "$BASE" =~ ^[0-9]+$ ]]; then
   echo "Aviso: a porta de chat ($BASE) não é mais necessária e foi ignorada."
   BASE="${4:-}"
 fi
+VERSAO="${VERSAO:-15}"
 DOMINIO="${DOMINIO:-}"
 EMAIL="${EMAIL:-}"
 REPO="${REPO:-https://github.com/ronaldopadula/odoo-15-br-docker-compose}"
 REF="${REF:-master}"
-ODOO_IMAGE="${ODOO_IMAGE:-odoo:15.0}"
-POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:16}"
+ODOO_IMAGE="${ODOO_IMAGE:-odoo:$VERSAO.0}"
+POSTGRES_IMAGE="${POSTGRES_IMAGE:-}"   # vazio: escolhido conforme a imagem do Odoo
 CADDY_IMAGE="${CADDY_IMAGE:-caddy:2}"
 
-uso() { sed -n '2,26p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 1; }
+uso() { sed -n '2,29p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 1; }
 erro() { echo "ERRO: $*" >&2; exit 1; }
 porta_ocupada() { ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1\$"; }
 
 [ -n "$DESTINO" ] && [ -n "$PORTA" ] || uso
 [ "$(id -u)" -eq 0 ] || erro "rode com sudo."
+case "$VERSAO" in 14|15|16) ;; *) erro "VERSAO deve ser 14, 15 ou 16." ;; esac
 [[ "$PORTA" =~ ^[0-9]+$ ]] && [ "$PORTA" -ge 1024 ] && [ "$PORTA" -le 65535 ] || erro "use uma porta entre 1024 e 65535."
 [ -z "$BASE" ] || [[ "$BASE" =~ ^[a-zA-Z0-9_]+$ ]] || erro "nome da base: use só letras, números e _."
 [ ! -e "$DESTINO" ] || erro "a pasta $DESTINO já existe."
@@ -118,7 +123,7 @@ PROJETO=$(basename "$DESTINO" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9\n_-' 
     echo "HTTP_PORT=$PORTA"
   fi
   echo "ODOO_IMAGE=$ODOO_IMAGE"
-  echo "POSTGRES_IMAGE=$POSTGRES_IMAGE"
+  echo "POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:16}"
   echo "CADDY_IMAGE=$CADDY_IMAGE"
 } > .env
 umask 022
@@ -127,7 +132,20 @@ echo ">> Ajuste do sistema (inotify, para várias instâncias)"
 echo "fs.inotify.max_user_watches = 524288" > /etc/sysctl.d/90-odoo-inotify.conf
 sysctl -q -p /etc/sysctl.d/90-odoo-inotify.conf || true
 
-echo ">> Baixando as imagens e fixando as versões (digest)"
+echo ">> Baixando a imagem do Odoo $VERSAO"
+docker pull -q "$ODOO_IMAGE" </dev/null >/dev/null
+if [ -z "$POSTGRES_IMAGE" ]; then
+  # O backup do Gerenciador usa o pg_dump da imagem do Odoo, que não aceita
+  # servidor PostgreSQL mais novo que ele: escolhe a versão compatível (máx. 16).
+  PGCLI=$(docker run --rm --entrypoint pg_dump "$ODOO_IMAGE" --version 2>/dev/null | grep -oE '[0-9]+' | head -1 || true)
+  [[ "$PGCLI" =~ ^[0-9]+$ ]] || PGCLI=16
+  [ "$PGCLI" -gt 16 ] && PGCLI=16
+  POSTGRES_IMAGE="postgres:$PGCLI"
+  sed -i "s|^POSTGRES_IMAGE=.*|POSTGRES_IMAGE=$POSTGRES_IMAGE|" .env
+fi
+echo "   PostgreSQL: $POSTGRES_IMAGE"
+
+echo ">> Baixando as demais imagens e fixando as versões (digest)"
 "${DC[@]}" pull -q </dev/null
 for var in ODOO_IMAGE POSTGRES_IMAGE CADDY_IMAGE; do
   img=$(grep "^$var=" .env | cut -d= -f2-)
@@ -143,7 +161,7 @@ GESTOR_HASH=$(printf '%s\n%s\n' "$GESTOR_SENHA" "$GESTOR_SENHA" | docker run --r
 [[ "$GESTOR_HASH" == \$2* ]] || erro "não foi possível gerar o hash da senha do gerenciador."
 ENDERECO=":80"; [ -n "$DOMINIO" ] && ENDERECO="$DOMINIO"
 cat > proxy/Caddyfile <<EOF
-# Gerado pelo instalar.sh — instância $DESTINO
+# Gerado pelo instalar.sh — instância $DESTINO (Odoo $VERSAO)
 {
 	admin off
 	${EMAIL:+email $EMAIL}
@@ -152,18 +170,24 @@ cat > proxy/Caddyfile <<EOF
 $ENDERECO {
 	encode gzip
 
-	# Gerenciador de Bancos: exige o usuário e a senha abaixo (proxy) e,
-	# depois, a senha mestra do Odoo. A escolha da base no login fica livre.
-	@gestor path /web/database/manager /web/database/create /web/database/duplicate /web/database/drop /web/database/backup /web/database/restore /web/database/change_password /xmlrpc/db /xmlrpc/2/db
+	# Gerenciador de Bancos e serviço de bancos da API: exigem o usuário e a
+	# senha abaixo (proxy) e, depois, a senha mestra do Odoo. O /jsonrpc entra
+	# aqui porque também aceita operações de banco (criar, copiar, excluir).
+	# A escolha da base no login e a API XML-RPC (common/object) ficam livres.
+	@gestor path /web/database/manager /web/database/create /web/database/duplicate /web/database/drop /web/database/backup /web/database/restore /web/database/change_password /xmlrpc/db /xmlrpc/2/db /jsonrpc
 	basic_auth @gestor {
 		$GESTOR_USUARIO $GESTOR_HASH
 	}
 
+	# Live chat e notificações: /longpolling (Odoo 14 e 15) e /websocket (Odoo 16).
 	handle /longpolling/* {
-		reverse_proxy odoo15:8072
+		reverse_proxy odoo:8072
+	}
+	handle /websocket* {
+		reverse_proxy odoo:8072
 	}
 	handle {
-		reverse_proxy odoo15:8069
+		reverse_proxy odoo:8069
 	}
 }
 EOF
@@ -192,11 +216,11 @@ done
 SENHA_ADMIN=""
 if [ -n "$BASE" ]; then
   echo ">> Criando a base '$BASE' (sem dados de demonstração, em português)"
-  "${DC[@]}" run --rm -T odoo15 odoo -d "$BASE" -i base --without-demo=all \
+  "${DC[@]}" run --rm -T odoo odoo -d "$BASE" -i base --without-demo=all \
       --load-language=pt_BR --stop-after-init --no-http </dev/null
   SENHA_ADMIN=$(gerar 16)
   printf "u = env.ref('base.user_admin')\nu.password = '%s'\nu.lang = 'pt_BR'\nenv.cr.commit()\n" "$SENHA_ADMIN" \
-    | "${DC[@]}" run --rm -T odoo15 odoo shell -d "$BASE" --no-http >/dev/null
+    | "${DC[@]}" run --rm -T odoo odoo shell -d "$BASE" --no-http >/dev/null
 fi
 
 echo ">> Iniciando o Odoo e o proxy"
@@ -221,7 +245,7 @@ done
 
 umask 077
 {
-  echo "Instância: $DESTINO   (gerado em $(date '+%F %T'))"
+  echo "Instância: $DESTINO   Odoo $VERSAO   (gerado em $(date '+%F %T'))"
   echo "Acesso: $URL"
   echo "Gerenciador de Bancos: $URL/web/database/manager"
   echo "  1º usuário/senha (proxy): $GESTOR_USUARIO / $GESTOR_SENHA"
@@ -235,7 +259,7 @@ umask 022
 
 echo
 echo "=============================================================="
-if [ "$ok" = "1" ]; then echo " Odoo 15 pronto"; else echo " Odoo 15 iniciado (ainda carregando; aguarde 1 minuto)"; fi
+if [ "$ok" = "1" ]; then echo " Odoo $VERSAO pronto"; else echo " Odoo $VERSAO iniciado (ainda carregando; aguarde 1 minuto)"; fi
 echo
 echo "   Acesse:                $URL"
 echo "   Gerenciador de Bancos: $URL/web/database/manager"

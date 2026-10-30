@@ -1,13 +1,14 @@
 # Em primeiro lugar:
 Fork criado apenas para utilização em demonstração. Tradução ao Português com todos os créditos ao criador do código.
 
-# Odoo 15 em um comando
+# Odoo 14, 15 ou 16 em um comando
 
-Instala o Odoo 15 num servidor Linux (Ubuntu ou Debian) com **um único comando**.
+Instala o Odoo (versão 14, 15 ou 16) num servidor Linux (Ubuntu ou Debian) com **um único comando**.
 Ao final, o instalador mostra o endereço de acesso e todas as senhas.
 
-> O Odoo 15 não recebe mais atualizações de segurança do fabricante desde outubro de 2024.
-> Para uso real, siga o passo **"Usar com domínio (HTTPS)"** mais abaixo.
+> As versões 14, 15 e 16 já não têm imagens oficiais mantidas pela Odoo (foram retiradas em
+> nov/2023, out/2024 e set/2025, respectivamente). Para uso real, siga o passo
+> **"Usar com domínio (HTTPS)"** mais abaixo.
 
 ---
 
@@ -30,6 +31,12 @@ sudo bash instalar.sh odoo15-one 10015
 
 - `odoo15-one` é o nome da pasta onde a instalação fica guardada.
 - `10015` é a porta de acesso.
+- Sem indicar a versão, instala o **Odoo 15**. Para outra versão, use `VERSAO`:
+
+``` bash
+sudo VERSAO=16 bash instalar.sh odoo16 10016   # Odoo 16
+sudo VERSAO=14 bash instalar.sh odoo14 10014   # Odoo 14
+```
 
 O instalador faz tudo sozinho: instala o Docker (se precisar), gera as senhas e liga o Odoo.
 Leva de 3 a 10 minutos.
@@ -40,7 +47,7 @@ No final aparece um quadro com os endereços e as senhas:
 
 ```
 ==============================================================
- Odoo 15 pronto
+ Odoo 15 pronto      (ou 14 / 16, conforme a versão)
 
    Acesse:                http://IP_DO_SERVIDOR:10015
    Gerenciador de Bancos: http://IP_DO_SERVIDOR:10015/web/database/manager
@@ -63,7 +70,8 @@ digite **`gestor`** e a **senha do proxy** mostrada no quadro.
 > O aviso "conexão não é particular" aparece porque o acesso pelo IP não tem criptografia.
 > Ele some quando você usa um domínio (veja *Usar com domínio (HTTPS)*).
 
-Em seguida aparece o formulário de criação da base. Ele é do próprio Odoo e vem em inglês:
+Em seguida aparece o formulário de criação da base. Ele é do próprio Odoo e vem em inglês
+(as imagens são do Odoo 15; no 14 e no 16 as telas são praticamente iguais):
 
 <img src="screenshots/2-criar-base.png" width="380" alt="Formulário de criação de base do Odoo">
 
@@ -124,11 +132,23 @@ Sim. Crie quantas bases quiser no Gerenciador de Bancos. Na tela de login, cada 
 
 ### Posso instalar mais de um Odoo no mesmo servidor?
 
-Sim, com outra pasta e outra porta:
+Sim, inclusive de versões diferentes. Cada um com sua pasta e sua porta:
 
 ``` bash
 sudo bash instalar.sh odoo15-two 11015
+sudo VERSAO=16 bash instalar.sh odoo16 10016
 ```
+
+### Qual versão escolher?
+
+| Versão | Quando usar |
+|---|---|
+| **16** | instalações novas: é a mais recente das três |
+| **15** | padrão deste projeto; use se já tem bases na versão 15 |
+| **14** | apenas para abrir ou manter bases antigas da versão 14 |
+
+Uma base só abre na mesma versão em que foi criada. Passar uma base de uma versão para outra
+(migração) é um processo à parte, que não é feito por este instalador.
 
 ### Usar com domínio (HTTPS) — recomendado para uso real
 
@@ -179,7 +199,7 @@ Dentro da pasta da instalação (`cd odoo15-one`):
 | Ligar | `sudo docker compose up -d` |
 | Desligar | `sudo docker compose down` |
 | Reiniciar | `sudo docker compose restart` |
-| Ver o que está acontecendo (log) | `sudo docker compose logs -f odoo15` |
+| Ver o que está acontecendo (log) | `sudo docker compose logs -f odoo` |
 
 O Odoo volta a ligar sozinho se o servidor reiniciar.
 
@@ -196,11 +216,16 @@ no Odoo, vá em *Aplicativos › Atualizar lista de aplicativos*.
 <summary>Como a instalação é montada</summary>
 
 ```
-navegador ──> proxy Caddy (porta da instância) ──> Odoo 15 ──> PostgreSQL 16
+navegador ──> proxy Caddy (porta da instância) ──> Odoo 14/15/16 ──> PostgreSQL
 ```
 
 - Só o proxy recebe conexões de fora. Odoo e PostgreSQL ficam numa rede interna do Docker, sem portas publicadas.
-- O proxy encaminha o live chat (longpolling) e protege as rotas do Gerenciador de Bancos com `basic_auth`.
+- O proxy encaminha o live chat (`/longpolling` no 14/15, `/websocket` no 16) e protege com `basic_auth`
+  as rotas do Gerenciador de Bancos e do serviço de bancos da API (`/xmlrpc/db`, `/xmlrpc/2/db`, `/jsonrpc`).
+- A API XML-RPC (`/xmlrpc/2/common`, `/xmlrpc/2/object`) continua livre para integrações.
+  Integrações via JSON-RPC (`/jsonrpc`) precisam do usuário e senha do proxy.
+- O PostgreSQL é escolhido conforme o `pg_dump` da imagem do Odoo (até o 16), para que o
+  backup pelo Gerenciador funcione.
 - Com `DOMINIO`, o Caddy obtém e renova o certificado HTTPS (Let's Encrypt).
 - Senhas aleatórias geradas na instalação; o Odoo roda sem root; imagens fixadas por *digest* no `.env`.
 - Arquivos de cada instalação (não versionados): `.env`, `.credenciais`, `secrets/`, `etc/odoo.conf`, `proxy/`, `postgresql/`.
@@ -216,9 +241,10 @@ sudo bash instalar.sh <pasta> <porta> [base_inicial]
 
 | Variável | Para quê |
 |---|---|
+| `VERSAO=14`, `15` ou `16` | versão do Odoo (padrão: 15) |
 | `DOMINIO=erp.exemplo.com.br` | publica com HTTPS automático |
 | `EMAIL=ti@exemplo.com.br` | contato para avisos do certificado (opcional) |
-| `POSTGRES_IMAGE=postgres:14` | usar PostgreSQL 14 (padrão: 16) |
+| `POSTGRES_IMAGE=postgres:14` | fixar outra versão do PostgreSQL (padrão: automática) |
 | `REF=<branch>` | instalar outra versão deste repositório |
 
 </details>
@@ -235,7 +261,8 @@ sudo docker compose exec -T db createdb -U odoo NOME_DA_BASE
 sudo docker compose exec -T db pg_restore -U odoo -d NOME_DA_BASE --no-owner --no-privileges < backup.dump
 ```
 
-Um dump gerado no PostgreSQL 16 não pode ser restaurado num servidor 14.
+Um dump gerado num PostgreSQL mais novo não pode ser restaurado num servidor mais antigo
+(ex.: dump do 16 num servidor 13).
 
 </details>
 
