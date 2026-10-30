@@ -1,14 +1,14 @@
 # Em primeiro lugar:
 Fork criado apenas para utilização em demonstração. Tradução ao Português com todos os créditos ao criador do código.
 
-# Odoo 14, 15 ou 16 em um comando
+# Odoo 14, 15, 16 ou 18 em um comando
 
-Instala o Odoo (versão 14, 15 ou 16) num servidor Linux (Ubuntu ou Debian) com **um único comando**.
+Instala o Odoo (versão 14, 15, 16 ou 18) num servidor Linux (Ubuntu ou Debian) com **um único comando**.
 Ao final, o instalador mostra o endereço de acesso e todas as senhas.
 
-> As versões 14, 15 e 16 já não têm imagens oficiais mantidas pela Odoo (foram retiradas em
-> nov/2023, out/2024 e set/2025, respectivamente). Para uso real, siga o passo
-> **"Usar com domínio (HTTPS)"** mais abaixo.
+> Das versões disponíveis, só a **18** ainda tem imagem oficial mantida pela Odoo. As versões 14, 15
+> e 16 tiveram as imagens retiradas em nov/2023, out/2024 e set/2025, respectivamente. Para uso real,
+> siga o passo **"Usar com domínio (HTTPS)"** mais abaixo.
 
 ---
 
@@ -34,6 +34,7 @@ sudo bash instalar.sh odoo15-one 10015
 - Sem indicar a versão, instala o **Odoo 15**. Para outra versão, use `VERSAO`:
 
 ``` bash
+sudo VERSAO=18 bash instalar.sh odoo18 10018   # Odoo 18
 sudo VERSAO=16 bash instalar.sh odoo16 10016   # Odoo 16
 sudo VERSAO=14 bash instalar.sh odoo14 10014   # Odoo 14
 ```
@@ -71,7 +72,7 @@ digite **`gestor`** e a **senha do proxy** mostrada no quadro.
 > Ele some quando você usa um domínio (veja *Usar com domínio (HTTPS)*).
 
 Em seguida aparece o formulário de criação da base. Ele é do próprio Odoo e vem em inglês
-(as imagens são do Odoo 15; no 14 e no 16 as telas são praticamente iguais):
+(as imagens são do Odoo 15; nas outras versões as telas são parecidas):
 
 <img src="screenshots/2-criar-base.png" width="380" alt="Formulário de criação de base do Odoo">
 
@@ -143,7 +144,8 @@ sudo VERSAO=16 bash instalar.sh odoo16 10016
 
 | Versão | Quando usar |
 |---|---|
-| **16** | instalações novas: é a mais recente das três |
+| **18** | **instalações novas**: única das quatro com suporte da Odoo (imagem oficial mantida) |
+| **16** | bases existentes na versão 16 |
 | **15** | padrão deste projeto; use se já tem bases na versão 15 |
 | **14** | apenas para abrir ou manter bases antigas da versão 14 |
 
@@ -216,11 +218,11 @@ no Odoo, vá em *Aplicativos › Atualizar lista de aplicativos*.
 <summary>Como a instalação é montada</summary>
 
 ```
-navegador ──> proxy Caddy (porta da instância) ──> Odoo 14/15/16 ──> PostgreSQL
+navegador ──> proxy Caddy (porta da instância) ──> Odoo 14/15/16/18 ──> PostgreSQL
 ```
 
 - Só o proxy recebe conexões de fora. Odoo e PostgreSQL ficam numa rede interna do Docker, sem portas publicadas.
-- O proxy encaminha o live chat (`/longpolling` no 14/15, `/websocket` no 16) e protege com `basic_auth`
+- O proxy encaminha o live chat (`/longpolling` no 14/15, `/websocket` no 16/18) e protege com `basic_auth`
   as rotas do Gerenciador de Bancos e do serviço de bancos da API (`/xmlrpc/db`, `/xmlrpc/2/db`, `/jsonrpc`).
 - A API XML-RPC (`/xmlrpc/2/common`, `/xmlrpc/2/object`) continua livre para integrações.
   Integrações via JSON-RPC (`/jsonrpc`) precisam do usuário e senha do proxy.
@@ -241,7 +243,7 @@ sudo bash instalar.sh <pasta> <porta> [base_inicial]
 
 | Variável | Para quê |
 |---|---|
-| `VERSAO=14`, `15` ou `16` | versão do Odoo (padrão: 15) |
+| `VERSAO=14`, `15`, `16` ou `18` | versão do Odoo (padrão: 15) |
 | `DOMINIO=erp.exemplo.com.br` | publica com HTTPS automático |
 | `EMAIL=ti@exemplo.com.br` | contato para avisos do certificado (opcional) |
 | `POSTGRES_IMAGE=postgres:14` | fixar outra versão do PostgreSQL (padrão: automática) |
