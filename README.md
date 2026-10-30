@@ -11,7 +11,7 @@ Ao final, o instalador mostra o endereço de acesso e todas as senhas.
 
 ---
 
-## Instalação em 3 passos
+## Instalação passo a passo
 
 ### 1. Entre no servidor
 
@@ -34,9 +34,9 @@ sudo bash instalar.sh odoo15-one 10015
 O instalador faz tudo sozinho: instala o Docker (se precisar), gera as senhas e liga o Odoo.
 Leva de 3 a 10 minutos.
 
-### 3. Abra no navegador
+### 3. Guarde os dados do quadro final
 
-No final aparece um quadro assim:
+No final aparece um quadro com os endereços e as senhas:
 
 ```
 ==============================================================
@@ -50,11 +50,53 @@ No final aparece um quadro assim:
 ==============================================================
 ```
 
-Abra o endereço **Gerenciador de Bancos** e crie a sua primeira base de dados.
-Depois é só acessar o endereço **Acesse**.
+### 4. Crie a sua primeira base de dados
+
+Abra o endereço do **Gerenciador de Bancos**. O navegador pede um usuário e uma senha:
+digite **`gestor`** e a **senha do proxy** mostrada no quadro.
 
 > **Não abriu?** O provedor provavelmente tem um firewall. Na DigitalOcean:
 > *Networking › Firewalls* › regra de entrada liberando a porta **10015** (TCP).
+
+<img src="screenshots/1-senha-do-gerenciador.png" width="600" alt="Janela de usuário e senha do navegador">
+
+> O aviso "conexão não é particular" aparece porque o acesso pelo IP não tem criptografia.
+> Ele some quando você usa um domínio (veja *Usar com domínio (HTTPS)*).
+
+Em seguida aparece o formulário de criação da base. Ele é do próprio Odoo e vem em inglês:
+
+<img src="screenshots/2-criar-base.png" width="380" alt="Formulário de criação de base do Odoo">
+
+| Campo | O que preencher |
+|---|---|
+| **Master Password** | a **senha mestra** mostrada no quadro final |
+| **Database Name** | nome da base, sem espaços nem acentos (ex.: `minhaempresa`) |
+| **Email** | o login do administrador da base (pode ser o seu e-mail) |
+| **Password** | a senha do administrador — **anote**, é com ela que você vai entrar |
+| **Phone number** | opcional |
+| **Language** | `Portuguese (BR) / Português (BR)` |
+| **Country** | `Brazil` |
+| **Demo data** | **deixe desmarcado** (marcado, a base vem cheia de dados fictícios) |
+
+Clique em **Create database** e aguarde cerca de 1 minuto.
+
+### 5. Entre no Odoo
+
+Abra o endereço **Acesse**. Se houver mais de uma base, escolha qual abrir:
+
+<img src="screenshots/4-escolher-base.png" width="380" alt="Tela de escolha da base de dados">
+
+Entre com o e-mail e a senha que você definiu no formulário:
+
+<img src="screenshots/5-login.png" width="260" alt="Tela de login do Odoo em português">
+
+Pronto. A tela inicial mostra os aplicativos que você pode instalar (Vendas, Compras, Estoque,
+Contabilidade etc.):
+
+<img src="screenshots/6-aplicativos.png" width="700" alt="Tela de aplicativos do Odoo em português">
+
+> Os botões **Upgrade** são de recursos da versão paga (Enterprise), que não fazem parte desta
+> instalação. Use os aplicativos com o botão **Instalar**.
 
 ---
 
@@ -114,7 +156,19 @@ O quadro final mostra o usuário `admin` e a senha dessa base.
 
 ### Como faço backup?
 
-Pelo navegador: **Gerenciador de Bancos › Backup**. O arquivo baixado inclui a base e os anexos.
+Pelo navegador, no **Gerenciador de Bancos**:
+
+<img src="screenshots/3-gerenciador.png" width="380" alt="Gerenciador de Bancos com as opções Backup, Duplicate e Delete">
+
+| Botão | Para quê |
+|---|---|
+| **Backup** | baixa uma cópia da base (escolha o formato *zip*: inclui os anexos) |
+| **Duplicate** | cria uma cópia da base no servidor (útil para testes) |
+| **Delete** | exclui a base — **não tem volta** |
+| **Restore Database** | carrega um backup baixado antes |
+| **Set Master Password** | troca a senha mestra |
+
+Todas as operações pedem a senha mestra.
 
 ### Como ligo, desligo ou reinicio?
 
@@ -210,13 +264,3 @@ da Trustcode), descomente a linha do `entrypoint.sh` no `docker-compose.yml` e r
   instale com esta versão e restaure.
 
 </details>
-
-## Odoo 15 screenshots
-
-<img src="screenshots/odoo-15-welcome-screenshot.png" width="50%">
-
-<img src="screenshots/odoo-15-apps-screenshot.png" width="100%">
-
-<img src="screenshots/odoo-15-sales-screen.png" width="100%">
-
-<img src="screenshots/odoo-15-product-form.png" width="100%">
