@@ -1,5 +1,10 @@
-# Odoo 15 + PostgreSQL — uma instância por pasta de deploy.
+# Odoo 15 + PostgreSQL + proxy (Caddy) — uma instância por pasta.
 # Os valores ${...} vêm do arquivo .env, gerado pelo instalar.sh (não versionado).
+#
+#   navegador ──> proxy (porta pública) ──> odoo15 (8069 / 8072) ──> db
+#
+# Só o proxy recebe conexões de fora. O Odoo e o PostgreSQL ficam numa rede
+# interna do Docker, sem portas publicadas.
 services:
   db:
     image: ${POSTGRES_IMAGE:-postgres:16}
@@ -14,19 +19,12 @@ services:
       - ./postgresql:/var/lib/postgresql/data
     networks:
       - interna
-    # Nenhuma porta publicada: o banco só é acessível pelo contêiner do Odoo.
 
   odoo15:
     image: ${ODOO_IMAGE:-odoo:15.0}
     restart: unless-stopped
     depends_on:
       - db
-    ports:
-      # Publicadas apenas em 127.0.0.1: o acesso externo passa pelo Nginx (HTTPS).
-      # O Docker cria regras próprias de firewall que o ufw não filtra; por isso
-      # nunca publique estas portas em 0.0.0.0.
-      - "127.0.0.1:${ODOO_PORT:-10015}:8069"
-      - "127.0.0.1:${CHAT_PORT:-20015}:8072"
     tty: true
     command: --
     environment:
@@ -39,6 +37,22 @@ services:
       # - ./entrypoint.sh:/entrypoint.sh   # descomente para instalar pacotes Python extras (etc/requirements.txt)
       - ./addons:/mnt/extra-addons
       - ./etc:/etc/odoo
+    networks:
+      - interna
+
+  proxy:
+    image: ${CADDY_IMAGE:-caddy:2}
+    restart: unless-stopped
+    depends_on:
+      - odoo15
+    ports:
+      # Porta de acesso da instância (ex.: http://IP:10015).
+      # Com domínio, o docker-compose.https.yml acrescenta as portas 80 e 443.
+      - "${HTTP_PORT:-10015}:80"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./proxy/data:/data
+      - ./proxy/config:/config
     networks:
       - interna
 
