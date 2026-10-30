@@ -1,4 +1,4 @@
-# Odoo (14, 15 ou 16) + PostgreSQL + proxy (Caddy) — uma instância por pasta.
+# Odoo (14, 15, 16 ou 18) + PostgreSQL + proxy (Caddy) — uma instância por pasta.
 # Os valores ${...} vêm do arquivo .env, gerado pelo instalar.sh (não versionado).
 #
 #   navegador ──> proxy (porta pública) ──> odoo (8069 / 8072) ──> db
