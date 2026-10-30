@@ -1,14 +1,27 @@
 # Em primeiro lugar:
 Fork criado apenas para utilização em demonstração. Tradução ao Português com todos os créditos ao criador do código.
 
-# Odoo 14, 15, 16 ou 18 em um comando
+# Odoo 15 em um comando
 
-Instala o Odoo (versão 14, 15, 16 ou 18) num servidor Linux (Ubuntu ou Debian) com **um único comando**.
+Instala o **Odoo 15** num servidor Linux (Ubuntu ou Debian) com **um único comando**.
 Ao final, o instalador mostra o endereço de acesso e todas as senhas.
 
-> Das versões disponíveis, só a **18** ainda tem imagem oficial mantida pela Odoo. As versões 14, 15
-> e 16 tiveram as imagens retiradas em nov/2023, out/2024 e set/2025, respectivamente. Para uso real,
-> siga o passo **"Usar com domínio (HTTPS)"** mais abaixo.
+> O Odoo 15 já não tem imagem oficial mantida pela Odoo (retirada em 07/10/2024).
+> Use-o para manter bases que já estão nessa versão. Para uso real, siga o passo
+> **"Usar com domínio (HTTPS)"** mais abaixo.
+
+Precisa de outra versão? Cada uma tem o seu repositório:
+
+| Versão | Situação | Repositório |
+|---|---|---|
+| Odoo 19 | com suporte da Odoo | [odoo-19-br-docker-compose](https://github.com/ronaldopadula/odoo-19-br-docker-compose) |
+| Odoo 18 | com suporte da Odoo | [odoo-18-br-docker-compose](https://github.com/ronaldopadula/odoo-18-br-docker-compose) |
+| Odoo 17 | sem suporte (bases existentes) | [odoo-17-br-docker-compose](https://github.com/ronaldopadula/odoo-17-br-docker-compose) |
+| Odoo 16 | sem suporte (bases existentes) | [odoo-16-br-docker-compose](https://github.com/ronaldopadula/odoo-16-br-docker-compose) |
+| **Odoo 15** (este) | sem suporte (bases existentes) | [odoo-15-br-docker-compose](https://github.com/ronaldopadula/odoo-15-br-docker-compose) |
+| Odoo 14 | sem suporte (bases existentes) | [odoo-14-br-docker-compose](https://github.com/ronaldopadula/odoo-14-br-docker-compose) |
+
+Uma base só abre na mesma versão em que foi criada. Se você já usa o Odoo, instale a versão das suas bases.
 
 ---
 
@@ -26,18 +39,11 @@ ssh root@IP_DO_SERVIDOR
 
 ``` bash
 curl -fsSLO https://raw.githubusercontent.com/ronaldopadula/odoo-15-br-docker-compose/master/instalar.sh
-sudo bash instalar.sh odoo15-one 10015
+sudo bash instalar.sh odoo15 10015
 ```
 
-- `odoo15-one` é o nome da pasta onde a instalação fica guardada.
+- `odoo15` é o nome da pasta onde a instalação fica guardada.
 - `10015` é a porta de acesso.
-- Sem indicar a versão, instala o **Odoo 15**. Para outra versão, use `VERSAO`:
-
-``` bash
-sudo VERSAO=18 bash instalar.sh odoo18 10018   # Odoo 18
-sudo VERSAO=16 bash instalar.sh odoo16 10016   # Odoo 16
-sudo VERSAO=14 bash instalar.sh odoo14 10014   # Odoo 14
-```
 
 O instalador faz tudo sozinho: instala o Docker (se precisar), gera as senhas e liga o Odoo.
 Leva de 3 a 10 minutos.
@@ -48,7 +54,7 @@ No final aparece um quadro com os endereços e as senhas:
 
 ```
 ==============================================================
- Odoo 15 pronto      (ou 14 / 16, conforme a versão)
+ Odoo 15 pronto
 
    Acesse:                http://IP_DO_SERVIDOR:10015
    Gerenciador de Bancos: http://IP_DO_SERVIDOR:10015/web/database/manager
@@ -72,7 +78,7 @@ digite **`gestor`** e a **senha do proxy** mostrada no quadro.
 > Ele some quando você usa um domínio (veja *Usar com domínio (HTTPS)*).
 
 Em seguida aparece o formulário de criação da base. Ele é do próprio Odoo e vem em inglês
-(as imagens são do Odoo 15; nas outras versões as telas são parecidas):
+(as imagens são do Odoo 15; nas outras versões a aparência muda um pouco, mas os campos são os mesmos):
 
 <img src="screenshots/2-criar-base.png" width="380" alt="Formulário de criação de base do Odoo">
 
@@ -114,7 +120,7 @@ Contabilidade etc.):
 ### Perdi as senhas. Como vejo de novo?
 
 ``` bash
-sudo cat odoo15-one/.credenciais
+sudo cat odoo15/.credenciais
 ```
 
 ### O que é o "Gerenciador de Bancos" e por que ele pede duas senhas?
@@ -133,24 +139,11 @@ Sim. Crie quantas bases quiser no Gerenciador de Bancos. Na tela de login, cada 
 
 ### Posso instalar mais de um Odoo no mesmo servidor?
 
-Sim, inclusive de versões diferentes. Cada um com sua pasta e sua porta:
+Sim, inclusive de versões diferentes (veja a tabela no início). Cada um com sua pasta e sua porta:
 
 ``` bash
-sudo bash instalar.sh odoo15-two 11015
-sudo VERSAO=16 bash instalar.sh odoo16 10016
+sudo bash instalar.sh odoo15-b 11015
 ```
-
-### Qual versão escolher?
-
-| Versão | Quando usar |
-|---|---|
-| **18** | **instalações novas**: única das quatro com suporte da Odoo (imagem oficial mantida) |
-| **16** | bases existentes na versão 16 |
-| **15** | padrão deste projeto; use se já tem bases na versão 15 |
-| **14** | apenas para abrir ou manter bases antigas da versão 14 |
-
-Uma base só abre na mesma versão em que foi criada. Passar uma base de uma versão para outra
-(migração) é um processo à parte, que não é feito por este instalador.
 
 ### Usar com domínio (HTTPS) — recomendado para uso real
 
@@ -171,7 +164,7 @@ renovado automaticamente. Só uma instalação por servidor pode usar domínio.
 Acrescente o nome da base no final do comando:
 
 ``` bash
-sudo bash instalar.sh odoo15-one 10015 minhaempresa
+sudo bash instalar.sh odoo15 10015 minhaempresa
 ```
 
 O quadro final mostra o usuário `admin` e a senha dessa base.
@@ -194,7 +187,7 @@ Todas as operações pedem a senha mestra.
 
 ### Como ligo, desligo ou reinicio?
 
-Dentro da pasta da instalação (`cd odoo15-one`):
+Dentro da pasta da instalação (`cd odoo15`):
 
 | Ação | Comando |
 |---|---|
@@ -207,23 +200,27 @@ O Odoo volta a ligar sozinho se o servidor reiniciar.
 
 ### Como instalo módulos extras (addons)?
 
-Copie as pastas dos módulos para `odoo15-one/addons/`, rode `sudo docker compose restart` e,
-no Odoo, vá em *Aplicativos › Atualizar lista de aplicativos*.
+Copie as pastas dos módulos para `odoo15/addons/`, rode `sudo docker compose restart` e,
+no Odoo, vá em *Aplicativos › Atualizar lista de aplicativos*. Os módulos precisam ser da
+versão 15.
 
 ---
 
 ## Detalhes técnicos
 
+Este repositório contém o instalador. Os repositórios das outras versões chamam este mesmo
+instalador, só mudando a versão — assim, uma correção vale para todas.
+
 <details>
 <summary>Como a instalação é montada</summary>
 
 ```
-navegador ──> proxy Caddy (porta da instância) ──> Odoo 14/15/16/18 ──> PostgreSQL
+navegador ──> proxy Caddy (porta da instância) ──> Odoo 15 ──> PostgreSQL
 ```
 
 - Só o proxy recebe conexões de fora. Odoo e PostgreSQL ficam numa rede interna do Docker, sem portas publicadas.
-- O proxy encaminha o live chat (`/longpolling` no 14/15, `/websocket` no 16/18) e protege com `basic_auth`
-  as rotas do Gerenciador de Bancos e do serviço de bancos da API (`/xmlrpc/db`, `/xmlrpc/2/db`, `/jsonrpc`).
+- O proxy encaminha o live chat e protege com `basic_auth` as rotas do Gerenciador de Bancos e do
+  serviço de bancos da API (`/xmlrpc/db`, `/xmlrpc/2/db`, `/jsonrpc`).
 - A API XML-RPC (`/xmlrpc/2/common`, `/xmlrpc/2/object`) continua livre para integrações.
   Integrações via JSON-RPC (`/jsonrpc`) precisam do usuário e senha do proxy.
 - O PostgreSQL é escolhido conforme o `pg_dump` da imagem do Odoo (até o 16), para que o
@@ -243,11 +240,10 @@ sudo bash instalar.sh <pasta> <porta> [base_inicial]
 
 | Variável | Para quê |
 |---|---|
-| `VERSAO=14`, `15`, `16` ou `18` | versão do Odoo (padrão: 15) |
+| `VERSAO=14` a `19` | instalar outra versão do Odoo (padrão: 15) |
 | `DOMINIO=erp.exemplo.com.br` | publica com HTTPS automático |
 | `EMAIL=ti@exemplo.com.br` | contato para avisos do certificado (opcional) |
 | `POSTGRES_IMAGE=postgres:14` | fixar outra versão do PostgreSQL (padrão: automática) |
-| `REF=<branch>` | instalar outra versão deste repositório |
 
 </details>
 
@@ -255,7 +251,7 @@ sudo bash instalar.sh <pasta> <porta> [base_inicial]
 <summary>Backup e restauração pelo console (bases grandes)</summary>
 
 ``` bash
-cd odoo15-one
+cd odoo15
 sudo docker compose exec -T db pg_dump -U odoo -Fc NOME_DA_BASE > backup.dump
 sudo tar -czf filestore.tar.gz -C etc/filestore NOME_DA_BASE
 
