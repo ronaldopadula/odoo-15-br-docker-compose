@@ -37,7 +37,7 @@ ssh root@IP_DO_SERVIDOR
 ### 2. Rode o instalador
 
 ``` bash
-curl -fsSLO https://raw.githubusercontent.com/ronaldopadula/odoo-18-br-docker-compose/master/instalar.sh
+curl -fsSLO https://raw.githubusercontent.com/ronaldopadula/odoo-18-br-docker-compose/main/instalar.sh
 sudo bash instalar.sh odoo18 10018
 ```
 

@@ -26,6 +26,9 @@ VERSOES = {
     18: dict(suporte=True),
     19: dict(suporte=True),
 }
+# Ramo principal de cada repositório (os criados em 2026 usam "main").
+RAMO = {14: "master", 15: "master", 16: "master", 17: "main", 18: "main", 19: "main"}
+
 # Repositórios cuja versão antiga publicava uma senha mestra fixa.
 LEGADO_SENHA_PUBLICA = {14, 15, 16}
 
@@ -85,7 +88,7 @@ def gerar(v):
     pasta = f"odoo{v}"
     porta = 10000 + v
     eh_central = v == 15
-    instalar_url = f"{RAW}/{repo(v)}/master/instalar.sh"
+    instalar_url = f"{RAW}/{repo(v)}/{RAMO[v]}/instalar.sh"
     img = "screenshots" if eh_central else IMG
 
     origem = (
