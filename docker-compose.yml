@@ -1,7 +1,7 @@
-# Odoo 15 + PostgreSQL + proxy (Caddy) — uma instância por pasta.
+# Odoo (14, 15 ou 16) + PostgreSQL + proxy (Caddy) — uma instância por pasta.
 # Os valores ${...} vêm do arquivo .env, gerado pelo instalar.sh (não versionado).
 #
-#   navegador ──> proxy (porta pública) ──> odoo15 (8069 / 8072) ──> db
+#   navegador ──> proxy (porta pública) ──> odoo (8069 / 8072) ──> db
 #
 # Só o proxy recebe conexões de fora. O Odoo e o PostgreSQL ficam numa rede
 # interna do Docker, sem portas publicadas.
@@ -20,8 +20,8 @@ services:
     networks:
       - interna
 
-  odoo15:
-    image: ${ODOO_IMAGE:-odoo:15.0}
+  odoo:
+    image: ${ODOO_IMAGE:-odoo:15.0}  # versão definida pelo instalar.sh (VERSAO)
     restart: unless-stopped
     depends_on:
       - db
@@ -44,7 +44,7 @@ services:
     image: ${CADDY_IMAGE:-caddy:2}
     restart: unless-stopped
     depends_on:
-      - odoo15
+      - odoo
     ports:
       # Porta de acesso da instância (ex.: http://IP:10015).
       # Com domínio, o docker-compose.https.yml acrescenta as portas 80 e 443.
